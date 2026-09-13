@@ -29,7 +29,22 @@ import AnomalySandbox from './components/AnomalySandbox';
 import CustomAnomalyModal from './components/CustomAnomalyModal';
 import StationDirectoryModal from './components/StationDirectoryModal';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_BASE) {
+    return import.meta.env.VITE_API_BASE;
+  }
+  if (typeof window === 'undefined') return 'http://localhost:8000';
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return 'http://localhost:8000';
+  }
+  if (host.startsWith('aws.')) {
+    return `${window.location.protocol}//${host.replace(/^aws\./, 'backend.')}`;
+  }
+  return '';
+};
+
+const API_BASE = getApiBase();
 
 export default function App() {
   const [stations, setStations] = useState([]);

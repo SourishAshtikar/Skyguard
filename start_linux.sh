@@ -1,23 +1,21 @@
 #!/bin/bash
 # ==============================================================================
-# SkyGuard AI — Repository Clone & Local Service Startup Script
+# SkyGuard AI — Repository Clone & Local Service Startup Script (CPU-Only)
 # ==============================================================================
-# Backend:  localhost:8000  (Tunneled via external cloudflared container -> backend.ashnet.qzz.io)
-# Frontend: localhost:3000  (Tunneled via external cloudflared container -> aws.ashnet.qzz.io)
+# Backend:  localhost:8000
+# Frontend: localhost:3000
 # Repo URL: https://github.com/SourishAshtikar/Skyguard.git
 # ==============================================================================
 
 set -e
 
-REPO_URL="https://github.com/SourishAshtikar/Skyguard.git"
-REPO_DIR="Skyguard"
-BACKEND_PORT=8000
-FRONTEND_PORT=3000
-BACKEND_DOMAIN="backend.ashnet.qzz.io"
-FRONTEND_DOMAIN="aws.ashnet.qzz.io"
+REPO_URL="${REPO_URL:-https://github.com/SourishAshtikar/Skyguard.git}"
+REPO_DIR="${REPO_DIR:-Skyguard}"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 
 echo "======================================================================"
-echo " SkyGuard AI — Launching Backend & Frontend Services"
+echo " SkyGuard AI — Launching Backend & Frontend Services (CPU Mode)"
 echo "======================================================================"
 
 # 1. Clone repository if not running inside the repository directory
@@ -32,7 +30,7 @@ fi
 
 PROJECT_ROOT="$(pwd)"
 
-# 2. Python Virtual Environment & Backend Setup
+# 2. Python Virtual Environment & Backend Setup (CPU Only)
 echo "[+] Setting up Python virtual environment..."
 if [ ! -d "venv" ]; then
     python3 -m venv venv || python -m venv venv
@@ -44,9 +42,17 @@ elif [ -f "venv/Scripts/activate" ]; then
     source venv/Scripts/activate
 fi
 
-echo "[+] Installing Backend Python dependencies..."
+echo "[+] Installing Backend Python dependencies (CPU-only, no NVIDIA packages)..."
 pip install --upgrade pip setuptools wheel --quiet
-pip install -e . --quiet || pip install -r requirements.txt --quiet
+
+# Install CPU PyTorch wheel explicitly
+pip install torch --extra-index-url https://download.pytorch.org/whl/cpu --quiet
+pip install -r requirements.txt --quiet
+pip install -e . --no-deps --quiet
+
+# Purge any redundant NVIDIA/CUDA packages to save disk space
+echo "[+] Purging redundant NVIDIA/CUDA packages if present..."
+pip list | grep -i nvidia | awk '{print $1}' | xargs pip uninstall -y 2>/dev/null || true
 
 # 3. Frontend Setup
 echo "[+] Setting up Frontend Node dependencies..."
@@ -76,17 +82,15 @@ sleep 3
 # 5. Start Frontend Server (localhost:3000)
 echo "[+] Starting SkyGuard Frontend server on http://localhost:$FRONTEND_PORT ..."
 cd "$PROJECT_ROOT/frontend"
-VITE_API_BASE="https://$BACKEND_DOMAIN" npm run dev -- --port $FRONTEND_PORT --host &
+npm run dev -- --port $FRONTEND_PORT --host &
 FRONTEND_PID=$!
 
 echo ""
 echo "======================================================================"
-echo " SkyGuard AI System Active & Running!"
+echo " SkyGuard AI System Active & Running (CPU Mode)!"
 echo "----------------------------------------------------------------------"
 echo " Local Backend API:       http://localhost:$BACKEND_PORT"
 echo " Local Frontend Web:      http://localhost:$FRONTEND_PORT"
-echo " External Tunnel API:     https://$BACKEND_DOMAIN"
-echo " External Tunnel Web:     https://$FRONTEND_DOMAIN"
 echo "======================================================================"
 echo " Press Ctrl+C to terminate services."
 echo ""
