@@ -13,6 +13,8 @@ import {
   Compass,
   ShieldCheck,
   ShieldAlert,
+  Satellite,
+  Sliders,
 } from 'lucide-react';
 
 import GisMap from './components/GisMap';
@@ -20,9 +22,9 @@ import TelemetryHUD from './components/TelemetryHUD';
 import DiagnosticTrace from './components/DiagnosticTrace';
 import ShapPanel from './components/ShapPanel';
 import SpatialNeighbors from './components/SpatialNeighbors';
+import SatelliteView from './components/SatelliteView';
 import AnomalySandbox from './components/AnomalySandbox';
 import CustomAnomalyModal from './components/CustomAnomalyModal';
-import { Sliders } from 'lucide-react';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -32,15 +34,16 @@ export default function App() {
   const [nearestNeighbors, setNearestNeighbors] = useState([]);
   const [telemetry, setTelemetry] = useState([]);
   const [latestResult, setLatestResult] = useState(null);
+  const [satelliteData, setSatelliteData] = useState(null);
   const [showCorrected, setShowCorrected] = useState(true);
   const [loading, setLoading] = useState(true);
   const [timeStr, setTimeStr] = useState('');
 
   // UI State: Active Inspector Tab & Drawer Collapse
-  const [activeTab, setActiveTab] = useState('telemetry'); // 'telemetry' | 'diagnostics' | 'explainability' | 'spatial'
+  const [activeTab, setActiveTab] = useState('telemetry'); // 'telemetry' | 'diagnostics' | 'explainability' | 'spatial' | 'satellite'
   const [isInspectorOpen, setIsInspectorOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'CRITICAL' | 'WARNING' | 'NORMAL'
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'CRITICAL' | 'WARNING' | 'WEATHER'
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
 
   // Live IST Clock
@@ -76,18 +79,28 @@ export default function App() {
     setSelectedStation(station);
 
     try {
-      // 1. Fetch nearest neighbors
-      const detailRes = await fetch(`${API_BASE}/api/stations/${station.station_id}`);
+      // Parallelize station details, telemetry history, and spaceborne satellite cross-check
+      const [detailRes, telRes, satRes] = await Promise.all([
+        fetch(`${API_BASE}/api/stations/${station.station_id}`),
+        fetch(`${API_BASE}/api/stations/${station.station_id}/telemetry?limit=48`),
+        fetch(`${API_BASE}/api/stations/${station.station_id}/satellite`).catch((err) => {
+          console.error('Error fetching satellite cross-check:', err);
+          return null;
+        }),
+      ]);
+
       const detailData = await detailRes.json();
-      setNearestNeighbors(detailData.nearest_neighbors || []);
-
-      // 2. Fetch recent telemetry
-      const telRes = await fetch(`${API_BASE}/api/stations/${station.station_id}/telemetry?limit=48`);
       const telData = await telRes.json();
-      setTelemetry(telData);
+      const satJson = satRes && satRes.ok ? await satRes.json() : null;
 
-      // 3. Evaluate latest reading in pipeline
-      if (telData.length > 0) {
+      setNearestNeighbors(detailData.nearest_neighbors || []);
+      setTelemetry(telData || []);
+      if (satJson) {
+        setSatelliteData(satJson);
+      }
+
+      // Evaluate latest reading in pipeline
+      if (telData && telData.length > 0) {
         const lastReading = telData[telData.length - 1];
         const evalRes = await fetch(`${API_BASE}/api/pipeline/evaluate`, {
           method: 'POST',
@@ -105,6 +118,24 @@ export default function App() {
         });
         const evalData = await evalRes.json();
         setLatestResult(evalData);
+        if (evalData?.satellite_cross_check) {
+          setSatelliteData(evalData.satellite_cross_check);
+        }
+
+        // Dynamically sync status on map pin
+        const newStatus = evalData.final_anomaly
+          ? 'CRITICAL'
+          : evalData.final_status === 'SUSPECT'
+          ? 'WARNING'
+          : evalData.anomaly_category === 'GENUINE_WEATHER_EVENT'
+          ? 'WEATHER'
+          : 'NORMAL';
+
+        setStations((prev) =>
+          prev.map((s) =>
+            s.station_id === station.station_id ? { ...s, status: newStatus } : s
+          )
+        );
       }
     } catch (err) {
       console.error('Error fetching station data:', err);
@@ -135,12 +166,16 @@ export default function App() {
       });
       const diagResult = await res.json();
       setLatestResult(diagResult);
+      if (diagResult?.satellite_cross_check) {
+        setSatelliteData(diagResult.satellite_cross_check);
+      }
 
       // Dynamically reflect anomaly on map pin
+      const newStatus = diagResult.final_anomaly ? 'CRITICAL' : 'WARNING';
       setStations((prev) =>
         prev.map((s) =>
           s.station_id === selectedStation.station_id
-            ? { ...s, status: diagResult.final_status === 'FAIL' ? 'CRITICAL' : 'WARNING' }
+            ? { ...s, status: newStatus }
             : s
         )
       );
@@ -173,11 +208,15 @@ export default function App() {
       });
       const diagResult = await res.json();
       setLatestResult(diagResult);
+      if (diagResult?.satellite_cross_check) {
+        setSatelliteData(diagResult.satellite_cross_check);
+      }
 
+      const newStatus = diagResult.final_anomaly ? 'CRITICAL' : 'WARNING';
       setStations((prev) =>
         prev.map((s) =>
           s.station_id === selectedStation.station_id
-            ? { ...s, status: diagResult.final_status === 'FAIL' ? 'CRITICAL' : 'WARNING' }
+            ? { ...s, status: newStatus }
             : s
         )
       );
@@ -198,6 +237,24 @@ export default function App() {
     }
   };
 
+  // Compute status counts for filter buttons
+  const counts = useMemo(() => {
+    let anomalies = 0;
+    let suspect = 0;
+    let weather = 0;
+    stations.forEach((s) => {
+      if (s.status === 'CRITICAL') anomalies++;
+      else if (s.status === 'WARNING') suspect++;
+      else if (s.status === 'WEATHER') weather++;
+    });
+    return {
+      all: stations.length,
+      anomalies,
+      suspect,
+      weather,
+    };
+  }, [stations]);
+
   // Filter stations based on search query & status pill
   const filteredStations = useMemo(() => {
     return stations.filter((s) => {
@@ -212,148 +269,165 @@ export default function App() {
     });
   }, [stations, searchQuery, statusFilter]);
 
-  const healthScore = latestResult?.sensor_health?.score_pct ?? 98.2;
+  // Dynamic health score computed from actual pipeline state (not a static pre-assigned value)
+  const rawHealthFromBackend = latestResult?.sensor_health?.health_score_pct;
+  const computedHealthScore = (() => {
+    if (rawHealthFromBackend != null) return rawHealthFromBackend;
+    // Build from first principles using what the pipeline actually reported
+    let score = 100.0;
+    const isAnom = latestResult?.final_anomaly ?? false;
+    const satInconsistent = latestResult?.satellite_cross_check?.is_satellite_inconsistent ?? false;
+    const tier1Pass = !isAnom;
+    const tier2Score = latestResult?.tier2?.anomaly_score ?? (isAnom ? 0.7 : 0.0);
+    const battV = latestResult?.raw_reading?.battery_voltage ?? selectedStation?.last_battery ?? 12.6;
+    const wmoFlag = latestResult?.wmo_qc_flag ?? (isAnom ? 2 : 0);
+
+    if (isAnom) score -= 40.0 * Math.min(1.0, tier2Score);  // anomaly penalty
+    if (satInconsistent) score -= 15.0;                      // satellite divergence
+    if (battV < 11.2) score -= 20.0;                         // low battery
+    else if (battV < 12.0) score -= 5.0;                     // marginal battery
+    if (wmoFlag === 3) score -= 10.0;                        // missing data
+
+    return Math.max(0, Math.min(100, score));
+  })();
+  const healthScore = computedHealthScore;
   const isAnomaly = latestResult?.final_anomaly ?? false;
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
-      {/* Top National Command Bar */}
+    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: '#0d1117' }}>
+      {/* Top Compact Command Header */}
       <header
         className="glass-panel"
         style={{
-          margin: '10px 14px 0 14px',
-          padding: '10px 18px',
+          margin: '8px 12px 0 12px',
+          padding: '6px 14px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          borderRadius: '10px',
+          borderRadius: '6px',
           zIndex: 10,
+          background: '#161b22',
+          border: '1px solid #30363d',
+          height: '46px',
         }}
       >
-        {/* Brand & National Mesonet Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Compact Logo & Brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              width: '26px',
+              height: '26px',
+              borderRadius: '4px',
+              background: '#1f6feb',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 14px rgba(56, 189, 248, 0.4)',
             }}
           >
-            <Shield size={20} color="#ffffff" />
+            <Shield size={15} color="#ffffff" />
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc' }}>
-                SkyGuard AI
-              </span>
-              <span className="badge badge-pass" style={{ fontSize: '0.65rem' }}>
-                National Mesonet Active
-              </span>
-            </div>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-              Intelligent 3-Tier Anomaly Detection &amp; Self-Healing AWS Network
-            </div>
-          </div>
+          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f0f6fc', letterSpacing: '-0.01em' }}>
+            SkyGuard AI
+          </span>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3fb950' }} title="National Mesonet Active" />
+          <span className="badge badge-purple" style={{ fontSize: '0.62rem', padding: '1px 5px' }}>
+            INSAT-3DR
+          </span>
         </div>
 
-        {/* Station Search & Filter Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Center: Search & Status Filter Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: '#0a101f',
-              border: '1px solid var(--border-subtle)',
+              background: '#0d1117',
+              border: '1px solid #30363d',
               borderRadius: '6px',
-              padding: '5px 10px',
-              width: '260px',
+              padding: '4px 8px',
+              width: '180px',
             }}
           >
-            <Search size={14} color="#64748b" />
+            <Search size={13} color="#8b949e" />
             <input
               type="text"
-              placeholder="Search 545 AWS stations..."
+              placeholder="Search stations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: '#f8fafc',
-                fontSize: '0.75rem',
+                color: '#f0f6fc',
+                fontSize: '0.72rem',
                 width: '100%',
               }}
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '3px', alignItems: 'center', background: '#0d1117', padding: '2px', borderRadius: '6px', border: '1px solid #30363d' }}>
             <button
-              className={`filter-pill ${statusFilter === 'ALL' ? 'active' : ''}`}
+              className={`btn-ghost ${statusFilter === 'ALL' ? 'btn-ghost-active' : ''}`}
               onClick={() => setStatusFilter('ALL')}
+              style={{ padding: '3px 8px', fontSize: '0.7rem' }}
             >
-              All ({stations.length})
+              All {counts.all}
             </button>
             <button
-              className={`filter-pill ${statusFilter === 'CRITICAL' ? 'active' : ''}`}
+              className={`btn-ghost ${statusFilter === 'CRITICAL' ? 'btn-ghost-active' : ''}`}
               onClick={() => setStatusFilter('CRITICAL')}
+              style={{ padding: '3px 8px', fontSize: '0.7rem', color: statusFilter === 'CRITICAL' ? '#ffffff' : '#f85149' }}
             >
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ff3366' }} />
-              Anomalies
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f85149' }} />
+              {counts.anomalies} Anom
             </button>
             <button
-              className={`filter-pill ${statusFilter === 'WARNING' ? 'active' : ''}`}
+              className={`btn-ghost ${statusFilter === 'WARNING' ? 'btn-ghost-active' : ''}`}
               onClick={() => setStatusFilter('WARNING')}
+              style={{ padding: '3px 8px', fontSize: '0.7rem', color: statusFilter === 'WARNING' ? '#ffffff' : '#d29922' }}
             >
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ffb800' }} />
-              Suspect
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#d29922' }} />
+              {counts.suspect} Susp
             </button>
-
             <button
-              className="btn-secondary"
-              onClick={() => setIsCustomModalOpen(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontSize: '0.75rem',
-                padding: '5px 12px',
-                color: '#00f0ff',
-                borderColor: 'rgba(0, 240, 255, 0.4)',
-                background: 'rgba(0, 240, 255, 0.08)',
-                fontWeight: 600,
-                marginLeft: '4px',
-              }}
-              title="Create & Inject Custom Anomaly with Exact Numbers"
+              className={`btn-ghost ${statusFilter === 'WEATHER' ? 'btn-ghost-active' : ''}`}
+              onClick={() => setStatusFilter('WEATHER')}
+              style={{ padding: '3px 8px', fontSize: '0.7rem', color: statusFilter === 'WEATHER' ? '#ffffff' : '#58a6ff' }}
             >
-              <Sliders size={13} color="#00f0ff" />
-              + Custom Anomaly
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#58a6ff' }} />
+              {counts.weather} Storm
             </button>
-          </div>
-        </div>
-
-        {/* Live IST Clock & Inspector Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', fontWeight: 600, color: '#38bdf8' }}>
-              {timeStr}
-            </div>
-            <div style={{ fontSize: '0.65rem', color: '#64748b' }}>UTC +05:30 (India)</div>
           </div>
 
           <button
-            className="btn-secondary"
+            className="btn-primary"
+            onClick={() => setIsCustomModalOpen(true)}
+            style={{
+              fontSize: '0.7rem',
+              padding: '4px 10px',
+              height: '28px',
+            }}
+            title="Create & Inject Custom Anomaly"
+          >
+            <Sliders size={12} />
+            + Anomaly
+          </button>
+        </div>
+
+        {/* Right: Live IST Clock & Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600, color: '#8b949e' }}>
+            {timeStr}
+          </span>
+
+          <button
+            className="btn-ghost"
             onClick={() => setIsInspectorOpen(!isInspectorOpen)}
-            style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
+            style={{ padding: '4px 8px', fontSize: '0.7rem', height: '28px' }}
             title="Toggle Inspector Drawer"
           >
-            {isInspectorOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-            <span>{isInspectorOpen ? 'Expand Map' : 'Show Inspector'}</span>
+            {isInspectorOpen ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
           </button>
         </div>
       </header>
@@ -362,10 +436,10 @@ export default function App() {
       <main
         style={{
           flex: 1,
-          padding: '10px 14px 14px 14px',
+          padding: '10px 12px 12px 12px',
           display: 'grid',
-          gridTemplateColumns: isInspectorOpen ? '1fr 480px' : '1fr',
-          gap: '12px',
+          gridTemplateColumns: isInspectorOpen ? '1fr 520px' : '1fr',
+          gap: '10px',
           overflow: 'hidden',
         }}
       >
@@ -376,13 +450,15 @@ export default function App() {
             position: 'relative',
             height: '100%',
             overflow: 'hidden',
-            borderRadius: '10px',
+            borderRadius: '6px',
             display: 'flex',
             flexDirection: 'column',
+            background: '#0d1117',
+            border: '1px solid #30363d',
           }}
         >
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#8b949e' }}>
               Loading India National Mesonet GIS Stations...
             </div>
           ) : (
@@ -394,12 +470,12 @@ export default function App() {
             />
           )}
 
-          {/* Sleek Floating Anomaly Sandbox Dock (Bottom Left) */}
+          {/* Clean Floating Anomaly Sandbox Dock (Bottom Left) */}
           <div
             style={{
               position: 'absolute',
-              bottom: '16px',
-              left: '16px',
+              bottom: '14px',
+              left: '14px',
               zIndex: 1000,
             }}
           >
@@ -420,17 +496,19 @@ export default function App() {
               display: 'flex',
               flexDirection: 'column',
               height: '100%',
-              borderRadius: '10px',
+              borderRadius: '6px',
               overflow: 'hidden',
+              background: '#161b22',
+              border: '1px solid #30363d',
             }}
           >
             {/* Inspector Header: Selected Station Card */}
             {selectedStation && (
               <div
                 style={{
-                  padding: '12px 16px',
-                  borderBottom: '1px solid var(--border-subtle)',
-                  background: 'rgba(10, 16, 30, 0.6)',
+                  padding: '10px 14px',
+                  borderBottom: '1px solid #30363d',
+                  background: '#161b22',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
@@ -438,32 +516,43 @@ export default function App() {
               >
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>
+                    <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#f0f6fc' }}>
                       {selectedStation.station_name}
                     </h2>
-                    <span className={`badge ${isAnomaly ? 'badge-fail' : 'badge-pass'}`}>
-                      {latestResult?.final_status ?? 'NOMINAL'}
+                    <span className={`badge ${isAnomaly ? 'badge-fail' : (selectedStation.status === 'WEATHER' ? 'badge-weather' : 'badge-pass')}`}>
+                      {latestResult?.final_status ?? selectedStation.status ?? 'NOMINAL'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.725rem', color: '#94a3b8', marginTop: '1px' }}>
-                    ID: <span style={{ fontFamily: 'var(--font-mono)', color: '#00f0ff' }}>{selectedStation.station_id}</span> • Elev: {selectedStation.elevation_m}m • {(!selectedStation.state || selectedStation.state === 'nan') ? 'National Mesonet' : selectedStation.state}
+                  <div style={{ fontSize: '0.72rem', color: '#8b949e', marginTop: '1px' }}>
+                    ID: <span style={{ fontFamily: 'var(--font-mono)', color: '#58a6ff' }}>{selectedStation.station_id}</span> • Elev: {selectedStation.elevation_m}m • {(!selectedStation.state || selectedStation.state === 'nan') ? 'National Mesonet' : selectedStation.state}
                   </div>
                 </div>
 
-                {/* Sensor Health Mini-Dial */}
+                {/* Sensor Health Mini-Dial — dynamically computed from pipeline */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'right' }}>
-                  <div>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>HEALTH</div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: healthScore > 80 ? '#22c55e' : (healthScore > 50 ? '#f59e0b' : '#f43f5e') }}>
-                      {healthScore}%
+                  <div title={[
+                    `Live Health Score — computed from actual sensor diagnostics:`,
+                    `• Base score: 100%`,
+                    latestResult?.final_anomaly ? `• Anomaly detected: −${Math.round(40 * Math.min(1, latestResult?.tier2?.anomaly_score ?? 0.7))}%` : `• No anomaly detected: 0%`,
+                    latestResult?.satellite_cross_check?.is_satellite_inconsistent ? `• Satellite divergence: −15%` : `• Satellite verified: 0%`,
+                    (latestResult?.raw_reading?.battery_voltage ?? 12.6) < 11.2 ? `• Low battery: −20%` : `• Battery OK: 0%`,
+                    `• Final: ${healthScore.toFixed(0)}%`,
+                  ].join('\n')} style={{ cursor: 'help' }}>
+                    <div style={{ fontSize: '0.62rem', color: '#8b949e', fontWeight: 600 }}>HEALTH</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: healthScore > 95 ? '#3fb950' : (healthScore > 75 ? '#d29922' : '#f85149'), fontFamily: 'var(--font-mono)' }}>
+                      {healthScore.toFixed(0)}%
+                    </div>
+                    <div style={{ fontSize: '0.55rem', color: healthScore > 95 ? '#3fb950' : '#d29922', fontWeight: 600 }}>
+                      {healthScore >= 100 ? '✓ ALL CLEAR' : healthScore > 90 ? 'GOOD' : healthScore > 75 ? 'DEGRADED' : 'FAULT'}
                     </div>
                   </div>
-                  {healthScore > 80 ? (
-                    <ShieldCheck size={22} color="#22c55e" />
+                  {healthScore > 90 ? (
+                    <ShieldCheck size={20} color="#3fb950" />
                   ) : (
-                    <ShieldAlert size={22} color={healthScore > 50 ? '#f59e0b' : '#f43f5e'} />
+                    <ShieldAlert size={20} color={healthScore > 60 ? '#d29922' : '#f85149'} />
                   )}
                 </div>
+
               </div>
             )}
 
@@ -471,8 +560,8 @@ export default function App() {
             <div
               style={{
                 display: 'flex',
-                borderBottom: '1px solid var(--border-subtle)',
-                background: 'rgba(10, 16, 30, 0.4)',
+                borderBottom: '1px solid #30363d',
+                background: '#0d1117',
                 overflowX: 'auto',
               }}
             >
@@ -483,6 +572,7 @@ export default function App() {
                 <ChartIcon size={14} />
                 Telemetry
               </button>
+
               <button
                 className={`tab-btn ${activeTab === 'diagnostics' ? 'active' : ''}`}
                 onClick={() => setActiveTab('diagnostics')}
@@ -490,6 +580,15 @@ export default function App() {
                 <Cpu size={14} />
                 Diagnostics
               </button>
+
+              <button
+                className={`tab-btn ${activeTab === 'satellite' ? 'active' : ''}`}
+                onClick={() => setActiveTab('satellite')}
+              >
+                <Satellite size={14} />
+                Satellite Cross-Check
+              </button>
+
               <button
                 className={`tab-btn ${activeTab === 'explainability' ? 'active' : ''}`}
                 onClick={() => setActiveTab('explainability')}
@@ -497,6 +596,7 @@ export default function App() {
                 <Sparkles size={14} />
                 TreeSHAP &amp; RCA
               </button>
+
               <button
                 className={`tab-btn ${activeTab === 'spatial' ? 'active' : ''}`}
                 onClick={() => setActiveTab('spatial')}
@@ -506,8 +606,8 @@ export default function App() {
               </button>
             </div>
 
-            {/* Active Tab Body (Scrollable, Clean & Uncluttered) */}
-            <div style={{ flex: 1, padding: '14px', overflowY: 'auto' }}>
+            {/* Active Tab Body */}
+            <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
               {activeTab === 'telemetry' && (
                 <TelemetryHUD
                   station={selectedStation}
@@ -520,6 +620,15 @@ export default function App() {
 
               {activeTab === 'diagnostics' && (
                 <DiagnosticTrace latestResult={latestResult} />
+              )}
+
+              {activeTab === 'satellite' && (
+                <SatelliteView
+                  station={selectedStation}
+                  satelliteData={satelliteData}
+                  telemetry={telemetry}
+                  latestResult={latestResult}
+                />
               )}
 
               {activeTab === 'explainability' && (

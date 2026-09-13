@@ -4,8 +4,9 @@ Invoked conditionally for readings flagged as suspicious by Stage 1 Forecaster (
 Evaluates the 29 features + forecast residuals + Mahalanobis distance.
 """
 
+from pathlib import Path
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import numpy as np
 from sklearn.ensemble import IsolationForest
 
@@ -30,6 +31,24 @@ class AugmentedIsolationForest:
         # Replace any residual NaNs with column medians
         cleaned = np.nan_to_num(feature_matrix, nan=0.0)
         self.model.fit(cleaned)
+        self.is_fitted = True
+
+    def save_model(self, file_path: Union[str, Path]):
+        """Persists trained isolation forest using joblib."""
+        import joblib
+        from pathlib import Path
+        path = Path(file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(self.model, path)
+
+    def load_model(self, file_path: Union[str, Path]):
+        """Loads trained isolation forest from file."""
+        import joblib
+        from pathlib import Path
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Isolation forest file not found at {path}")
+        self.model = joblib.load(path)
         self.is_fitted = True
 
     def evaluate(

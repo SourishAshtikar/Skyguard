@@ -6,6 +6,7 @@ Extracts all 29 canonical engineered features without data leakage.
 
 from collections import deque
 from datetime import datetime
+import math
 from typing import Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
@@ -61,11 +62,14 @@ class StreamingFeatureExtractor:
         """Ingests one reading (t) and returns dictionary with all 29 features."""
         # Convert timestamp
         if isinstance(timestamp, str):
-            dt = pd.to_datetime(timestamp)
-        elif isinstance(timestamp, datetime):
+            try:
+                dt = datetime.fromisoformat(timestamp)
+            except Exception:
+                dt = pd.to_datetime(timestamp)
+        elif isinstance(timestamp, (datetime, pd.Timestamp)):
             dt = timestamp
         else:
-            dt = pd.Timestamp(timestamp)
+            dt = pd.to_datetime(timestamp)
 
         # Fallback values for NaN readings (e.g. communication drops)
         t_val = float(temp) if temp is not None and not np.isnan(temp) else 25.0
@@ -130,16 +134,21 @@ class StreamingFeatureExtractor:
         recent_6 = list(self.history)[-n_6:]
         for p in ["temp", "pres", "humi"]:
             vals_6 = [item[p] for item in recent_6]
-            features[f"{p}_rmean_6h"] = float(np.mean(vals_6))
-            features[f"{p}_rstd_6h"] = float(np.std(vals_6, ddof=0)) if len(vals_6) > 1 else 0.0
+            m6 = sum(vals_6) / len(vals_6)
+            features[f"{p}_rmean_6h"] = float(m6)
+            if len(vals_6) > 1:
+                var6 = sum((x - m6) ** 2 for x in vals_6) / len(vals_6)
+                features[f"{p}_rstd_6h"] = float(math.sqrt(var6))
+            else:
+                features[f"{p}_rstd_6h"] = 0.0
 
         # Cyclical temporal context
         hour = dt.hour
         doy = dt.dayofyear if hasattr(dt, "dayofyear") else dt.timetuple().tm_yday
-        features["hour_sin"] = float(np.sin(2.0 * np.pi * hour / 24.0))
-        features["hour_cos"] = float(np.cos(2.0 * np.pi * hour / 24.0))
-        features["doy_sin"] = float(np.sin(2.0 * np.pi * doy / 365.25))
-        features["doy_cos"] = float(np.cos(2.0 * np.pi * doy / 365.25))
+        features["hour_sin"] = float(math.sin(2.0 * math.pi * hour / 24.0))
+        features["hour_cos"] = float(math.cos(2.0 * math.pi * hour / 24.0))
+        features["doy_sin"] = float(math.sin(2.0 * math.pi * doy / 365.25))
+        features["doy_cos"] = float(math.cos(2.0 * math.pi * doy / 365.25))
 
         # 24-hour rolling z-scores
         n_24 = min(len(self.history), 24)
@@ -147,8 +156,12 @@ class StreamingFeatureExtractor:
         eps = 1e-6
         for p in ["temp", "pres", "humi"]:
             vals_24 = [item[p] for item in recent_24]
-            mu = float(np.mean(vals_24))
-            sigma = float(np.std(vals_24, ddof=0)) if len(vals_24) > 1 else 0.0
+            mu = sum(vals_24) / len(vals_24)
+            if len(vals_24) > 1:
+                var24 = sum((x - mu) ** 2 for x in vals_24) / len(vals_24)
+                sigma = math.sqrt(var24)
+            else:
+                sigma = 0.0
             features[f"{p}_z"] = float((features[p] - mu) / (sigma + eps))
 
         return features

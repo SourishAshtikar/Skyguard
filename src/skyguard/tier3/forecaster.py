@@ -61,6 +61,8 @@ class StateSpaceForecaster:
         diurnal_h_delta = -1.2 * h_sin + 0.5 * h_cos  # Inverse of temperature
 
         x_pred = self.A @ self.x + np.array([diurnal_t_delta, 0.0, diurnal_h_delta])
+        # Enforce physical atmospheric humidity bound (0% to 100%)
+        x_pred[2] = float(np.clip(x_pred[2], 1.0, 100.0))
         P_pred = self.A @ self.P @ self.A.T + self.Q
 
         # Innovation covariance S = P_pred + R
@@ -109,11 +111,15 @@ class StateSpaceForecaster:
         # Kalman gain K = P_pred * S^-1
         K = P_pred @ S_inv
 
-        # Update state and covariance (dampen update if suspicious to avoid contamination)
-        effective_gain = K if not is_suspicious else 0.1 * K
-        self.x = x_pred + effective_gain @ residual
-        self.P = (np.eye(3) - effective_gain) @ P_pred
+        # Update state and covariance (freeze state update when suspicious/anomalous to prevent drift)
+        if is_suspicious:
+            self.x = x_pred
+            self.P = P_pred
+        else:
+            self.x = x_pred + K @ residual
+            self.P = (np.eye(3) - K) @ P_pred
 
+        self.x[2] = float(np.clip(self.x[2], 1.0, 100.0))
         latency_ms = (time.perf_counter() - t0) * 1000.0
 
         return Stage1ForecastOutput(

@@ -4,6 +4,7 @@ Performs ultra-fast (< 0.5 ms) forward pass of the compact autoencoder using num
 Computes scaled reconstruction error and normalized anomaly score (0.0 to 1.0).
 """
 
+from pathlib import Path
 import time
 from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
@@ -61,6 +62,34 @@ class Tier2InferenceEngine:
             "b_dec1": params["dec1.bias"],
             "W_dec2": params["dec2.weight"],
             "b_dec2": params["dec2.bias"],
+        }
+
+    def load_from_directory(self, model_dir: Union[str, Path]):
+        """Loads weights and scalers directly from saved model directory."""
+        import json
+        import torch
+        from pathlib import Path
+        model_dir = Path(model_dir)
+        cfg_file = model_dir / "tier2_config.json"
+        pth_file = model_dir / "tier2_autoencoder.pth"
+        if not cfg_file.exists() or not pth_file.exists():
+            raise FileNotFoundError(f"Tier 2 model files not found in {model_dir}")
+
+        config = json.loads(cfg_file.read_text(encoding="utf-8"))
+        self.mean = np.array(config["mean"], dtype=float)
+        self.std = np.array(config["std"], dtype=float)
+        self.threshold = float(config["threshold"])
+
+        state_dict = torch.load(pth_file, map_location="cpu")
+        self.weights = {
+            "W_enc1": state_dict["enc1.weight"].numpy(),
+            "b_enc1": state_dict["enc1.bias"].numpy(),
+            "W_enc2": state_dict["enc2.weight"].numpy(),
+            "b_enc2": state_dict["enc2.bias"].numpy(),
+            "W_dec1": state_dict["dec1.weight"].numpy(),
+            "b_dec1": state_dict["dec1.bias"].numpy(),
+            "W_dec2": state_dict["dec2.weight"].numpy(),
+            "b_dec2": state_dict["dec2.bias"].numpy(),
         }
 
     def forward(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

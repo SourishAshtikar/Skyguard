@@ -138,6 +138,26 @@ class SpatialConsensusOutput:
 
 
 @dataclass
+class SatelliteCrossCheckOutput:
+    """Spaceborne satellite imagery & thermal infrared cross-check result (e.g. INSAT-3D/3DR)."""
+    satellite_id: str
+    pixel_latitude: float
+    pixel_longitude: float
+    land_surface_temp_c: Optional[float] = None
+    cloud_top_temp_c: Optional[float] = None
+    cloud_fraction_pct: Optional[float] = None
+    brightness_temp_k: Optional[float] = None
+    temp_consistency_score: float = 1.0  # 0.0 to 1.0
+    cloud_consistency_score: float = 1.0  # 0.0 to 1.0
+    satellite_consensus_score: float = 1.0  # Combined score
+    is_satellite_inconsistent: bool = False
+    is_convective_storm_confirmed: bool = False
+    satellite_note: str = ""
+    evidence: Dict[str, Any] = field(default_factory=dict)
+    latency_ms: float = 0.0
+
+
+@dataclass
 class Stage3ArbiterOutput:
     """Decision from the hierarchical XGBoost classifier."""
     is_weather_event: bool
@@ -185,6 +205,7 @@ class DiagnosticResult:
     stage1_forecast: Optional[Stage1ForecastOutput]
     stage2_isoforest: Optional[Stage2IsoForestOutput]
     spatial_consensus: Optional[SpatialConsensusOutput]
+    satellite_cross_check: Optional[SatelliteCrossCheckOutput]
     stage3_arbiter: Optional[Stage3ArbiterOutput]
     final_status: QCStatus
     final_anomaly: bool
@@ -236,6 +257,25 @@ class DiagnosticResult:
                 "consensus_score": self.spatial_consensus.spatial_consensus_score,
                 "inconsistent": self.spatial_consensus.is_spatially_inconsistent,
             } if self.spatial_consensus else None,
+            "satellite_cross_check": {
+                "satellite_id": self.satellite_cross_check.satellite_id,
+                "land_surface_temp_c": self.satellite_cross_check.land_surface_temp_c,
+                "cloud_top_temp_c": self.satellite_cross_check.cloud_top_temp_c,
+                "cloud_fraction_pct": self.satellite_cross_check.cloud_fraction_pct,
+                "brightness_temp_k": self.satellite_cross_check.brightness_temp_k,
+                "temp_consistency_score": self.satellite_cross_check.temp_consistency_score,
+                "cloud_consistency_score": self.satellite_cross_check.cloud_consistency_score,
+                "consensus_score": self.satellite_cross_check.satellite_consensus_score,
+                "satellite_consensus_score": self.satellite_cross_check.satellite_consensus_score,
+                "inconsistent": self.satellite_cross_check.is_satellite_inconsistent,
+                "is_satellite_inconsistent": self.satellite_cross_check.is_satellite_inconsistent,
+                "convective_storm_confirmed": self.satellite_cross_check.is_convective_storm_confirmed,
+                "is_convective_storm_confirmed": self.satellite_cross_check.is_convective_storm_confirmed,
+                "note": self.satellite_cross_check.satellite_note,
+                "satellite_note": self.satellite_cross_check.satellite_note,
+                "evidence": self.satellite_cross_check.evidence,
+                "latency_ms": self.satellite_cross_check.latency_ms,
+            } if self.satellite_cross_check else None,
             "stage3_arbiter": {
                 "is_weather_event": self.stage3_arbiter.is_weather_event,
                 "root_cause": self.stage3_arbiter.root_cause_label,
@@ -255,14 +295,24 @@ class DiagnosticResult:
             "plain_english_rca": self.plain_english_rca,
             "sensor_health": {
                 "score_pct": self.sensor_health.health_score_pct,
+                "health_score_pct": self.sensor_health.health_score_pct,
                 "status": self.sensor_health.status,
                 "action": self.sensor_health.recommended_action,
+                "recommended_action": self.sensor_health.recommended_action,
+                "rolling_anomaly_rate": self.sensor_health.rolling_anomaly_rate,
+                "consecutive_failures": self.sensor_health.consecutive_failures,
+                "drift_indicator": self.sensor_health.drift_indicator,
+                "missing_data_ratio": self.sensor_health.missing_data_ratio,
+                "predicted_maintenance_days": self.sensor_health.predicted_maintenance_days,
             },
             "corrected_telemetry": {
                 "applied": self.corrected_telemetry.applied,
                 "temp": self.corrected_telemetry.temperature,
+                "temperature": self.corrected_telemetry.temperature,
                 "pres": self.corrected_telemetry.pressure,
+                "pressure": self.corrected_telemetry.pressure,
                 "humi": self.corrected_telemetry.humidity,
+                "humidity": self.corrected_telemetry.humidity,
                 "method": self.corrected_telemetry.method,
             },
             "total_latency_ms": self.total_latency_ms,

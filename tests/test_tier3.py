@@ -46,13 +46,26 @@ def test_hierarchical_arbiter():
         "dp_depress": 8.0,
         "temp_delta_1": 0.5,
     }
-    out = arbiter.evaluate(
+    # Nominal reading test
+    out_nominal = arbiter.evaluate(
         features=features,
         spatial_consensus=None,
         mahalanobis_d2=1.5,
         tier1_fired_rules=[],
         tier2_score=0.1,
     )
-    assert out.confidence > 0.6
-    assert len(out.shap_attributions) > 0
-    assert out.latency_ms < 15.0  # Fast sub-15ms TreeSHAP
+    assert out_nominal.confidence > 0.6
+    assert out_nominal.anomaly_category == AnomalyCategory.NONE
+
+    # Anomalous / fault reading test (triggers TreeSHAP attributions)
+    out_anom = arbiter.evaluate(
+        features=features,
+        spatial_consensus=None,
+        mahalanobis_d2=25.0,
+        tier1_fired_rules=["STEP_CHECK"],
+        tier2_score=0.92,
+    )
+    assert out_anom.anomaly_category != AnomalyCategory.NONE
+    assert len(out_anom.shap_attributions) > 0
+    assert out_anom.latency_ms < 15.0  # Fast sub-15ms TreeSHAP
+

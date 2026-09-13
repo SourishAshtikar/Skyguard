@@ -41,6 +41,7 @@ class SpatialNeighborResolver:
         self.min_neighbors = min_neighbors
         self.max_neighbors = max_neighbors
         self.stations_df: Optional[pd.DataFrame] = None
+        self._neighbor_cache: Dict[Tuple[str, Optional[float]], List[Dict[str, Any]]] = {}
 
         if metadata_csv_path:
             self.load_metadata(metadata_csv_path)
@@ -60,11 +61,16 @@ class SpatialNeighborResolver:
         df["LONGITUDE"] = pd.to_numeric(df["LONGITUDE"], errors="coerce")
         df = df.dropna(subset=["LATITUDE", "LONGITUDE"]).reset_index(drop=True)
         self.stations_df = df
+        self._neighbor_cache.clear()
 
     def find_nearest_neighbors(
         self, station_id: str, max_radius_km: Optional[float] = None
     ) -> List[Dict[str, Any]]:
-        """Finds closest stations within search radius."""
+        """Finds closest stations within search radius with instant caching."""
+        cache_key = (str(station_id), max_radius_km)
+        if cache_key in self._neighbor_cache:
+            return self._neighbor_cache[cache_key]
+
         if self.stations_df is None or len(self.stations_df) == 0:
             return []
 
@@ -93,7 +99,9 @@ class SpatialNeighborResolver:
                 })
 
         neighbors.sort(key=lambda x: x["distance_km"])
-        return neighbors[: self.max_neighbors]
+        res = neighbors[: self.max_neighbors]
+        self._neighbor_cache[cache_key] = res
+        return res
 
     def evaluate_consensus(
         self,

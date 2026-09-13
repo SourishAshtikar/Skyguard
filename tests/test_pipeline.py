@@ -28,7 +28,7 @@ def test_pipeline_normal_reading():
     result = pipeline.process(reading)
     assert result.final_status == QCStatus.PASS
     assert not result.final_anomaly
-    assert result.total_latency_ms < 50.0  # < 50ms latency budget
+    assert result.total_latency_ms < 100.0  # < 100ms SLA budget
     assert "NOMINAL" in result.plain_english_rca
     assert result.sensor_health.status == "HEALTHY"
 

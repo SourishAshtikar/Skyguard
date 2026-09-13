@@ -13,19 +13,20 @@ export default function AnomalySandbox({ onInject, onRestore, onOpenCustom, isSi
     <div
       className="glass-panel"
       style={{
-        padding: '8px 14px',
+        padding: '6px 12px',
         display: 'flex',
         alignItems: 'center',
-        gap: '10px',
-        backdropFilter: 'blur(16px)',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        gap: '8px',
+        background: '#161b22',
+        border: '1px solid #30363d',
+        borderRadius: '6px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <Zap size={15} color="#ffb800" />
-        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f8fafc', whiteSpace: 'nowrap' }}>
-          ANOMALY INJECTOR:
+        <Zap size={14} color="#d29922" />
+        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b949e', whiteSpace: 'nowrap' }}>
+          FAULT INJECTION:
         </span>
       </div>
 
@@ -34,66 +35,66 @@ export default function AnomalySandbox({ onInject, onRestore, onOpenCustom, isSi
         value={anomalyType}
         onChange={(e) => setAnomalyType(e.target.value)}
         style={{
-          background: '#0a101f',
-          color: '#f8fafc',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '6px',
-          padding: '5px 10px',
-          fontSize: '0.75rem',
+          background: '#0d1117',
+          color: '#f0f6fc',
+          border: '1px solid #30363d',
+          borderRadius: '4px',
+          padding: '4px 8px',
+          fontSize: '0.72rem',
           outline: 'none',
           cursor: 'pointer',
         }}
       >
-        <option value="SPIKE">⚡ Sensor Spike (+18°C)</option>
-        <option value="FROZEN">❄️ Stuck / Frozen Sensor</option>
-        <option value="DRIFT">📈 Calibration Drift (+8.5 hPa)</option>
-        <option value="DROPOUT">📡 Comms Telemetry Dropout</option>
-        <option value="CORRUPTION">👾 Bit Framing Corruption (x10)</option>
-        <option value="PHYSICAL">🧪 Dew Point &gt; Air Temp</option>
-        <option value="NOISE">〰️ High-Frequency Noise Jitter</option>
-        <option value="RANGE">🚨 Extreme Range Violation (64.5°C)</option>
+        <option value="SPIKE">Sensor Spike (+18°C)</option>
+        <option value="FROZEN">Stuck / Frozen Sensor</option>
+        <option value="DRIFT">Calibration Drift (+8.5 hPa)</option>
+        <option value="DROPOUT">Comms Telemetry Dropout</option>
+        <option value="CORRUPTION">Bit Framing Corruption (x10)</option>
+        <option value="PHYSICAL">Dew Point &gt; Air Temp</option>
+        <option value="NOISE">High-Frequency Noise Jitter</option>
+        <option value="RANGE">Physical Range Violation (64.5°C)</option>
       </select>
 
       {/* Preset Inject Button */}
       <button
-        className="btn-danger"
+        className="btn-ghost"
         onClick={handleInjectClick}
         disabled={isSimulating}
-        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', padding: '5px 12px' }}
+        style={{
+          fontSize: '0.72rem',
+          padding: '4px 10px',
+          color: '#f85149',
+          borderColor: 'rgba(248, 81, 73, 0.4)',
+        }}
       >
         <Play size={11} />
-        Inject Preset
+        Inject Fault
       </button>
 
       {/* Custom Anomaly Builder Modal Trigger */}
       <button
         type="button"
-        className="btn-secondary"
+        className="btn-ghost"
         onClick={onOpenCustom}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '5px',
-          fontSize: '0.75rem',
-          padding: '5px 12px',
-          color: '#00f0ff',
-          borderColor: 'rgba(0, 240, 255, 0.4)',
-          background: 'rgba(0, 240, 255, 0.08)',
-          fontWeight: 600,
+          fontSize: '0.72rem',
+          padding: '4px 10px',
+          color: '#58a6ff',
+          borderColor: 'rgba(88, 166, 255, 0.4)',
         }}
         title="Open Custom Anomaly Builder with direct values and offset sliders"
       >
-        <Sliders size={12} color="#00f0ff" />
-        + Custom Anomaly
+        <Sliders size={11} />
+        Custom Fault
       </button>
 
       <button
-        className="btn-secondary"
+        className="btn-ghost"
         onClick={onRestore}
-        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', padding: '5px 10px' }}
+        style={{ fontSize: '0.72rem', padding: '4px 10px' }}
       >
         <RotateCcw size={11} />
-        Restore
+        Restore Nominal
       </button>
     </div>
   );

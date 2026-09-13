@@ -224,13 +224,13 @@ export default function GisMap({
         {selectedStation && (
           <CircleMarker
             center={[selectedStation.latitude, selectedStation.longitude]}
-            radius={14}
+            radius={15}
             pathOptions={{
               color: '#00f0ff',
               fillColor: '#00f0ff',
-              fillOpacity: 0.15,
-              weight: 1.8,
-              dashArray: '2, 3',
+              fillOpacity: 0.2,
+              weight: 2.0,
+              dashArray: '3, 4',
             }}
           />
         )}
@@ -243,32 +243,34 @@ export default function GisMap({
           position: 'absolute',
           bottom: '16px',
           right: '16px',
-          padding: '6px 14px',
+          padding: '8px 16px',
           zIndex: 1000,
           fontSize: '11px',
           display: 'flex',
-          gap: '14px',
+          gap: '16px',
           alignItems: 'center',
-          backdropFilter: 'blur(16px)',
-          background: 'rgba(8, 14, 26, 0.85)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(20px)',
+          background: 'rgba(5, 5, 8, 0.95)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
+          borderRadius: '8px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.8)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00e599' }} />
-          <span style={{ color: '#cbd5e1' }}>Nominal</span>
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#00e599', boxShadow: '0 0 8px #00e599' }} />
+          <span style={{ color: '#f8fafc', fontWeight: 600 }}>Nominal</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffb800' }} />
-          <span style={{ color: '#cbd5e1' }}>Suspect</span>
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ffb800', boxShadow: '0 0 8px #ffb800' }} />
+          <span style={{ color: '#f8fafc', fontWeight: 600 }}>Suspect</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff3366' }} />
-          <span style={{ color: '#cbd5e1' }}>Anomaly</span>
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ff3366', boxShadow: '0 0 8px #ff3366' }} />
+          <span style={{ color: '#f8fafc', fontWeight: 600 }}>Anomaly</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00f0ff' }} />
-          <span style={{ color: '#cbd5e1' }}>Extreme Weather</span>
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#00f0ff', boxShadow: '0 0 8px #00f0ff' }} />
+          <span style={{ color: '#f8fafc', fontWeight: 600 }}>Extreme Weather</span>
         </div>
       </div>
     </div>

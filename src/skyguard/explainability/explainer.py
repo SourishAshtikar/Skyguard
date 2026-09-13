@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Any
 from skyguard.config.contracts import (
     AnomalyCategory,
     RuleResult,
+    SatelliteCrossCheckOutput,
     Severity,
     SpatialConsensusOutput,
     Stage1ForecastOutput,
@@ -36,6 +37,7 @@ class IncidentExplainer:
         spatial: Optional[SpatialConsensusOutput],
         arbiter: Optional[Stage3ArbiterOutput],
         final_anomaly: bool,
+        satellite: Optional[SatelliteCrossCheckOutput] = None,
     ) -> str:
         """Constructs an audited, human-readable meteorological RCA narrative with deep scientific explanation."""
         t_val = raw_values.get("temperature")
@@ -51,10 +53,11 @@ class IncidentExplainer:
                 if (spatial and spatial.neighbor_count > 0)
                 else "Single-station physics verified."
             )
+            sat_note = f" Cross-verified with {satellite.satellite_id} spaceborne thermal IR imagery." if satellite else ""
             return (
                 f"Station {station_name} [{station_id}] telemetry ({t_str}, {p_str}, {h_str}) is VERIFIED NOMINAL at {timestamp}. "
                 f"All deterministic WMO quality thresholds (Range, 4σ Step, Persistence, and Dew Point) passed without violations. "
-                f"Thermodynamic relationships conform strictly to the Magnus-Tetens atmospheric equation. {spatial_note}"
+                f"Thermodynamic relationships conform strictly to the Magnus-Tetens atmospheric equation. {spatial_note}{sat_note}"
             )
 
         lines = [
@@ -119,10 +122,25 @@ class IncidentExplainer:
                     "    Reasoning: Spatial peers confirm similar atmospheric movements across the mesonet cluster."
                 )
 
+        # Spaceborne Satellite Verification Section
+        if satellite:
+            lines.extend([
+                "",
+                "3. SPACEBORNE SATELLITE IMAGERY & THERMAL IR CROSS-CHECK:",
+            ])
+            lines.append(f"  • Satellite Feed: {satellite.satellite_id} (Pixel: {satellite.pixel_latitude:.2f}°N, {satellite.pixel_longitude:.2f}°E)")
+            if satellite.land_surface_temp_c is not None:
+                lines.append(f"  • Spaceborne Land Surface Temp (LST): {satellite.land_surface_temp_c:.1f}°C vs AWS {t_str}")
+            if satellite.cloud_fraction_pct is not None:
+                lines.append(f"  • Satellite Cloud Cover / Mask: {satellite.cloud_fraction_pct:.0f}%")
+            if satellite.cloud_top_temp_c is not None:
+                lines.append(f"  • Cloud Top Temperature (CTT): {satellite.cloud_top_temp_c:.1f}°C")
+            lines.append(f"  • Satellite Diagnosis: {satellite.satellite_note}")
+
         # Machine Learning & State-Space Attribution
         lines.extend([
             "",
-            "3. MACHINE LEARNING & STATISTICAL ATTRIBUTIONS:",
+            "4. MACHINE LEARNING & STATISTICAL ATTRIBUTIONS:",
         ])
         if tier2 and tier2.is_anomaly:
             lines.append(
@@ -150,7 +168,7 @@ class IncidentExplainer:
         # Root Cause & Operator Action
         lines.extend([
             "",
-            "4. OPERATOR ROOT CAUSE ANALYSIS & RECOMMENDED ACTION:",
+            "5. OPERATOR ROOT CAUSE ANALYSIS & RECOMMENDED ACTION:",
         ])
         if arbiter and arbiter.is_weather_event:
             lines.append(

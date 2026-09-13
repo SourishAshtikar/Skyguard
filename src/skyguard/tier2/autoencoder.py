@@ -124,6 +124,39 @@ class Tier2AutoencoderTrainer:
 
         return history
 
+    def save(self, model_dir: Union[str, Path]):
+        """Saves PyTorch weights, config, and statistics to directory."""
+        import json
+        model_dir = Path(model_dir)
+        model_dir.mkdir(parents=True, exist_ok=True)
+        torch.save(self.model.state_dict(), model_dir / "tier2_autoencoder.pth")
+        config = {
+            "mean": self.mean.tolist(),
+            "std": self.std.tolist(),
+            "threshold": float(self.threshold),
+            "input_dim": len(self.mean),
+            "bottleneck_dim": 4,
+            "feature_names": TIER2_FEATURE_NAMES,
+        }
+        (model_dir / "tier2_config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+        self.export_cpp_header(model_dir / "tier2_weights.h")
+
+    def load(self, model_dir: Union[str, Path]):
+        """Loads PyTorch weights, config, and statistics from directory."""
+        import json
+        model_dir = Path(model_dir)
+        cfg_file = model_dir / "tier2_config.json"
+        pth_file = model_dir / "tier2_autoencoder.pth"
+        if not cfg_file.exists() or not pth_file.exists():
+            raise FileNotFoundError(f"Tier 2 model files not found in {model_dir}")
+        config = json.loads(cfg_file.read_text(encoding="utf-8"))
+        self.mean = np.array(config["mean"], dtype=float)
+        self.std = np.array(config["std"], dtype=float)
+        self.threshold = float(config["threshold"])
+        self.model = CompactAutoencoder(input_dim=config.get("input_dim", 10), bottleneck_dim=config.get("bottleneck_dim", 4))
+        self.model.load_state_dict(torch.load(pth_file, map_location="cpu"))
+        self.model.eval()
+
     def export_cpp_header(self, output_path: Union[str, Path]):
         """Exports weights, biases, mean, std, and threshold to an ESP32 C++ header file."""
         output_path = Path(output_path)

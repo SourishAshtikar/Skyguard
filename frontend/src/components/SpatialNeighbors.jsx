@@ -10,26 +10,26 @@ export default function SpatialNeighbors({
   if (!station) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {/* Cluster Summary Header Card */}
       <div
         className="glass-card"
         style={{
-          padding: '14px 16px',
+          padding: '10px 14px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'rgba(10, 16, 30, 0.65)',
+          background: '#161b22',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Compass size={18} color="#00f0ff" />
+          <Compass size={16} color="#58a6ff" />
           <div>
-            <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#f8fafc' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f0f6fc' }}>
               Spatial Mesonet Peer Consensus
             </h3>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-              150 km Haversine Correlation Radius • Barometric MSLP Reduced
+            <div style={{ fontSize: '0.7rem', color: '#8b949e' }}>
+              150 km Haversine Radius • Barometric MSLP Reduced
             </div>
           </div>
         </div>
@@ -39,53 +39,53 @@ export default function SpatialNeighbors({
       </div>
 
       {/* 3 Metric Summary Dial Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-        <div className="glass-card" style={{ padding: '10px 12px' }}>
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>CONSENSUS SCORE</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#00f0ff', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+        <div className="glass-card" style={{ padding: '8px 10px' }}>
+          <div style={{ fontSize: '0.65rem', color: '#8b949e', fontWeight: 600 }}>CONSENSUS SCORE</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#58a6ff', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
             {((spatialConsensus?.spatial_consensus_score ?? 0.95) * 100).toFixed(0)}%
           </div>
-          <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Cluster Correlation</div>
+          <div style={{ fontSize: '0.65rem', color: '#6e7681' }}>Cluster Correlation</div>
         </div>
 
-        <div className="glass-card" style={{ padding: '10px 12px' }}>
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>TARGET DEVIATION</div>
+        <div className="glass-card" style={{ padding: '8px 10px' }}>
+          <div style={{ fontSize: '0.65rem', color: '#8b949e', fontWeight: 600 }}>TARGET DEVIATION</div>
           <div
             style={{
-              fontSize: '1.3rem',
-              fontWeight: 800,
-              color: (spatialConsensus?.target_deviation_temp || 0) > 4.0 ? '#ff3366' : '#00e599',
+              fontSize: '1.2rem',
+              fontWeight: 700,
+              color: (spatialConsensus?.target_deviation_temp || 0) > 4.0 ? '#f85149' : '#3fb950',
               marginTop: '2px',
               fontFamily: 'var(--font-mono)',
             }}
           >
             {spatialConsensus?.target_deviation_temp ? `${spatialConsensus.target_deviation_temp.toFixed(1)}°C` : '0.4°C'}
           </div>
-          <div style={{ fontSize: '0.65rem', color: '#64748b' }}>vs Regional Median</div>
+          <div style={{ fontSize: '0.65rem', color: '#6e7681' }}>vs Regional Median</div>
         </div>
 
-        <div className="glass-card" style={{ padding: '10px 12px' }}>
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>PEER STATIONS</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f8fafc', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
+        <div className="glass-card" style={{ padding: '8px 10px' }}>
+          <div style={{ fontSize: '0.65rem', color: '#8b949e', fontWeight: 600 }}>PEER STATIONS</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#f0f6fc', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
             {nearestNeighbors.length} AWS
           </div>
-          <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Live Synced Neighbors</div>
+          <div style={{ fontSize: '0.65rem', color: '#6e7681' }}>Live Synced Neighbors</div>
         </div>
       </div>
 
       {/* Neighbor List with Real Live Telemetry Values */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f8fafc', letterSpacing: '0.03em' }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#8b949e', letterSpacing: '0.03em' }}>
             CORROBORATING PEER SENSOR STREAMS:
           </span>
-          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+          <span style={{ fontSize: '0.68rem', color: '#6e7681' }}>
             Click station to switch inspector
           </span>
         </div>
 
         {nearestNeighbors.length === 0 ? (
-          <div className="glass-card" style={{ padding: '20px', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>
+          <div className="glass-card" style={{ padding: '16px', textAlign: 'center', fontSize: '0.75rem', color: '#8b949e' }}>
             Isolated station or no active AWS detected within 150 km.
           </div>
         ) : (
@@ -100,13 +100,12 @@ export default function SpatialNeighbors({
                 key={n.station_id}
                 className="glass-card"
                 style={{
-                  padding: '12px 14px',
+                  padding: '10px 12px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px',
+                  gap: '6px',
                   cursor: 'pointer',
-                  border: isNominal ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(255, 184, 0, 0.3)',
-                  transition: 'all 0.2s ease',
+                  border: isNominal ? '1px solid #30363d' : '1px solid #d29922',
                 }}
                 onClick={() => onSelectStation && onSelectStation(n)}
                 title={`Click to inspect ${n.station_name}`}
@@ -115,32 +114,22 @@ export default function SpatialNeighbors({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f8fafc' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f0f6fc' }}>
                         {idx + 1}. {n.station_name}
                       </span>
-                      <ArrowUpRight size={13} color="#00f0ff" />
+                      <ArrowUpRight size={12} color="#58a6ff" />
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '1px' }}>
-                      ID: <span style={{ fontFamily: 'var(--font-mono)', color: '#00f0ff' }}>{n.station_id}</span> • Elev: {n.elevation_m ? `${n.elevation_m}m` : 'N/A'}
+                    <div style={{ fontSize: '0.68rem', color: '#8b949e', marginTop: '1px' }}>
+                      ID: <span style={{ fontFamily: 'var(--font-mono)', color: '#58a6ff' }}>{n.station_id}</span> • Elev: {n.elevation_m ? `${n.elevation_m}m` : 'N/A'}
                     </div>
                   </div>
 
                   <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#00f0ff', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#58a6ff', fontFamily: 'var(--font-mono)' }}>
                       {n.distance_km.toFixed(1)} km
                     </span>
                     <div style={{ marginTop: '2px' }}>
-                      <span
-                        style={{
-                          fontSize: '0.65rem',
-                          fontWeight: 700,
-                          padding: '1px 6px',
-                          borderRadius: '8px',
-                          background: isNominal ? 'rgba(0, 229, 153, 0.12)' : 'rgba(255, 184, 0, 0.12)',
-                          color: isNominal ? '#00e599' : '#ffb800',
-                          border: `1px solid ${isNominal ? 'rgba(0, 229, 153, 0.3)' : 'rgba(255, 184, 0, 0.3)'}`,
-                        }}
-                      >
+                      <span className={`badge ${isNominal ? 'badge-pass' : 'badge-warning'}`} style={{ fontSize: '0.62rem' }}>
                         {isNominal ? 'Synced • Nominal' : 'Variance Suspect'}
                       </span>
                     </div>
@@ -153,23 +142,23 @@ export default function SpatialNeighbors({
                     display: 'grid',
                     gridTemplateColumns: 'repeat(3, 1fr)',
                     gap: '6px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    padding: '6px 8px',
+                    borderRadius: '4px',
+                    background: '#0d1117',
+                    border: '1px solid #30363d',
                   }}
                 >
                   {/* Temperature */}
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#94a3b8' }}>
-                      <Thermometer size={10} color="#00f0ff" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#8b949e' }}>
+                      <Thermometer size={10} color="#58a6ff" />
                       <span>Temp</span>
                     </div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f0f6fc', fontFamily: 'var(--font-mono)' }}>
                       {tempVal}
                     </div>
                     {n.delta_t != null && (
-                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_t) > 3.0 ? '#ffb800' : '#00e599' }}>
+                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_t) > 3.0 ? '#d29922' : '#3fb950' }}>
                         Δ {n.delta_t > 0 ? `+${n.delta_t}` : n.delta_t}°C
                       </div>
                     )}
@@ -177,15 +166,15 @@ export default function SpatialNeighbors({
 
                   {/* Pressure */}
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#94a3b8' }}>
-                      <Gauge size={10} color="#a855f7" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#8b949e' }}>
+                      <Gauge size={10} color="#bc8cff" />
                       <span>Pres</span>
                     </div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f0f6fc', fontFamily: 'var(--font-mono)' }}>
                       {presVal}
                     </div>
                     {n.delta_p != null && (
-                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_p) > 4.0 ? '#ffb800' : '#a855f7' }}>
+                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_p) > 4.0 ? '#d29922' : '#bc8cff' }}>
                         Δ {n.delta_p > 0 ? `+${n.delta_p}` : n.delta_p} hPa
                       </div>
                     )}
@@ -193,15 +182,15 @@ export default function SpatialNeighbors({
 
                   {/* Humidity */}
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#94a3b8' }}>
-                      <Droplets size={10} color="#00e599" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#8b949e' }}>
+                      <Droplets size={10} color="#3fb950" />
                       <span>Humi</span>
                     </div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f0f6fc', fontFamily: 'var(--font-mono)' }}>
                       {humiVal}
                     </div>
                     {n.delta_h != null && (
-                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_h) > 15.0 ? '#ffb800' : '#00e599' }}>
+                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_h) > 15.0 ? '#d29922' : '#3fb950' }}>
                         Δ {n.delta_h > 0 ? `+${n.delta_h}` : n.delta_h}%
                       </div>
                     )}
