@@ -64,6 +64,20 @@ export default function TelemetryHUD({
   const [copied, setCopied] = useState(false);
   const [isRawLogOpen, setIsRawLogOpen] = useState(false);
 
+  // Auto-switch active tab to the parameter with the active anomaly if present
+  React.useEffect(() => {
+    if (!latestResult?.final_anomaly) return;
+    const rules = latestResult?.tier1?.rules_fired || [];
+    const cat = latestResult?.anomaly_category || '';
+    if (cat === 'CALIBRATION_DRIFT' || rules.some(r => r.includes('PRES'))) {
+      setActiveParam('pressure');
+    } else if (cat === 'FROZEN_SENSOR' || rules.some(r => r.includes('HUMI'))) {
+      setActiveParam('humidity');
+    } else if (cat === 'SPIKE' || rules.some(r => r.includes('TEMP') || r === 'STEP_CHECK')) {
+      setActiveParam('temperature');
+    }
+  }, [latestResult]);
+
   if (!station) {
     return (
       <div className="glass-card" style={{ padding: '24px', textAlign: 'center', color: '#a1a1aa' }}>
@@ -79,20 +93,6 @@ export default function TelemetryHUD({
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  // Auto-switch active tab to the parameter with the active anomaly if present
-  React.useEffect(() => {
-    if (!latestResult?.final_anomaly) return;
-    const rules = latestResult?.tier1?.rules_fired || [];
-    const cat = latestResult?.anomaly_category || '';
-    if (cat === 'CALIBRATION_DRIFT' || rules.some(r => r.includes('PRES'))) {
-      setActiveParam('pressure');
-    } else if (cat === 'FROZEN_SENSOR' || rules.some(r => r.includes('HUMI'))) {
-      setActiveParam('humidity');
-    } else if (cat === 'SPIKE' || rules.some(r => r.includes('TEMP') || r === 'STEP_CHECK')) {
-      setActiveParam('temperature');
-    }
-  }, [latestResult]);
 
   const rawTemp = latestResult?.raw_reading?.temperature ?? (telemetry.length ? telemetry[telemetry.length - 1]?.temperature : 28.0);
   const rawPres = latestResult?.raw_reading?.pressure ?? (telemetry.length ? telemetry[telemetry.length - 1]?.pressure : 1012.0);
