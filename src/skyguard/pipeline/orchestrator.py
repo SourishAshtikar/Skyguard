@@ -103,7 +103,16 @@ class SkyGuardPipeline:
         feats = self.feature_extractor.process(ts_str, t, p, h)
 
         # Step 3: Tier 1 Edge QC Rules
-        t1_out = self.tier1_engine.evaluate(t, p, h, feats)
+        is_precip = getattr(reading, "is_precipitating", None)
+        if is_precip is None and satellite_observation:
+            is_precip = satellite_observation.get("is_precipitating", False)
+
+        t1_out = self.tier1_engine.evaluate(
+            t, p, h, feats,
+            latitude=reading.latitude,
+            timestamp=ts_str,
+            is_precipitating=is_precip,
+        )
 
         # Step 4: Tier 2 Edge Autoencoder Inference
         t2_out = self.tier2_engine.evaluate(feats)
@@ -168,7 +177,8 @@ class SkyGuardPipeline:
         elif t1_out.status == QCStatus.FAIL:
             is_anomaly = True
             final_status = QCStatus.FAIL
-            severity = Severity.CRITICAL if ("DEW_POINT_INVARIANT" in t1_out.rules_fired or "RANGE_CHECK" in t1_out.rules_fired) else Severity.HIGH
+            hard_rules = ("DEW_POINT_INVARIANT", "RANGE_CHECK", "SEASONAL_RANGE_CHECK", "RAIN_THERMAL_INCONSISTENCY")
+            severity = Severity.CRITICAL if any(r in t1_out.rules_fired for r in hard_rules) else Severity.HIGH
         elif spatial_out.is_spatially_inconsistent:
             is_anomaly = True
             final_status = QCStatus.FAIL

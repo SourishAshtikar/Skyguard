@@ -386,7 +386,7 @@ class INSATSatelliteValidator:
         wmo_label = self._wmo_label(weather_code)
         if is_convective_storm:
             note = (
-                f"STORM CONFIRMED by {sat_id}: Convective cloud top {ctt_val:.1f}°C, "
+                f"STORM CONFIRMED by {sat_id}: Deep convective cloud top {ctt_val:.1f}°C, "
                 f"{cf_val:.0f}% cloud cover. WMO code {weather_code} ({wmo_label}). "
                 f"Rain: {rain_mm:.1f}mm."
             )
@@ -400,7 +400,7 @@ class INSATSatelliteValidator:
             )
         elif is_temp_inconsistent:
             note = (
-                f"Thermal divergence: AWS {target_temp:.1f}°C vs satellite LST {lst_val:.1f}°C "
+                f"Thermal divergence alert: AWS {target_temp:.1f}°C vs satellite LST {lst_val:.1f}°C "
                 f"(Δ={temp_diff:.1f}°C, {cf_val:.0f}% cloud cover)."
             )
         elif is_moisture_inconsistent:

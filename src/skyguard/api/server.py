@@ -9,7 +9,7 @@ Exposes high-speed endpoints for:
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from skyguard.config.contracts import SensorReading
 from skyguard.pipeline import SkyGuardPipeline
-from skyguard.spatial import SpatialNeighborResolver
+from skyguard.spatial import SpatialNeighborResolver, resolve_station_state
 
 app = FastAPI(
     title="SkyGuard AI National AWS Intelligence API",
@@ -77,12 +77,21 @@ def load_stations_metadata():
             initial_status = "NORMAL"  # Verified Nominal
             health = round(97.5 + (h_val % 3) * 0.8, 1)
 
+        st_name = str(row.get("STATION_NAME", "AWS Station"))
+        lat = float(row["LATITUDE"])
+        lon = float(row["LONGITUDE"])
+        raw_st = str(row.get("STATE", "")).strip()
+        if raw_st and raw_st != "nan" and raw_st != "India" and raw_st != "None":
+            state_resolved = raw_st
+        else:
+            state_resolved = resolve_station_state(st_name, lat, lon)
+
         stations_metadata_cache.append({
             "station_id": sid,
-            "station_name": str(row.get("STATION_NAME", "AWS Station")),
-            "state": str(row.get("STATE", "India")),
-            "latitude": float(row["LATITUDE"]),
-            "longitude": float(row["LONGITUDE"]),
+            "station_name": st_name,
+            "state": state_resolved,
+            "latitude": lat,
+            "longitude": lon,
             "elevation_m": float(row["ELEVATION_M"]) if pd.notna(row.get("ELEVATION_M")) else 150.0,
             "status": initial_status,
             "health_score": health,
@@ -215,21 +224,17 @@ def get_station_telemetry(station_id: str, limit: int = 48):
     return live_telemetry_fetcher.fetch_live_telemetry(station_id, lat, lon, limit=limit)
 
 
-@app.get("/api/stations/{station_id}")
-def get_station_detail(station_id: str):
-    """Returns station details and its nearest neighboring AWS stations with live telemetry values and deltas."""
-    found = next((s for s in stations_metadata_cache if s["station_id"] == station_id), None)
-    if not found:
-        raise HTTPException(status_code=404, detail="Station ID not found")
-
+def compute_enriched_neighbors(
+    station_id: str,
+    target_t: Optional[float],
+    target_p: Optional[float],
+    target_h: Optional[float],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, float]]]:
+    """Computes nearest neighbors, real-time live deltas against target reading, and neighbor telemetry map."""
     neighbors = spatial_resolver.find_nearest_neighbors(station_id)
-    target_telemetry = get_station_telemetry(station_id, limit=1)
-    target_latest = target_telemetry[-1] if target_telemetry else {}
-    target_t = target_latest.get("temperature")
-    target_p = target_latest.get("pressure")
-    target_h = target_latest.get("humidity")
-
     enriched_neighbors = []
+    neighbor_telemetry = {}
+
     for n in neighbors:
         n_id = n["station_id"]
         n_tel = get_station_telemetry(n_id, limit=1)
@@ -253,6 +258,31 @@ def get_station_detail(station_id: str):
             "status": "NOMINAL" if (delta_t is not None and abs(delta_t) < 3.5) else "SUSPECT",
         })
 
+        if n_t is not None or n_p is not None or n_h is not None:
+            neighbor_telemetry[n_id] = {
+                "temperature": n_t,
+                "pressure": n_p,
+                "humidity": n_h,
+            }
+
+    return enriched_neighbors, neighbor_telemetry
+
+
+@app.get("/api/stations/{station_id}")
+def get_station_detail(station_id: str):
+    """Returns station details and its nearest neighboring AWS stations with live telemetry values and deltas."""
+    found = next((s for s in stations_metadata_cache if s["station_id"] == station_id), None)
+    if not found:
+        raise HTTPException(status_code=404, detail="Station ID not found")
+
+    target_telemetry = get_station_telemetry(station_id, limit=1)
+    target_latest = target_telemetry[-1] if target_telemetry else {}
+    target_t = target_latest.get("temperature")
+    target_p = target_latest.get("pressure")
+    target_h = target_latest.get("humidity")
+
+    enriched_neighbors, _ = compute_enriched_neighbors(station_id, target_t, target_p, target_h)
+
     return {
         "station": found,
         "target_telemetry": target_latest,
@@ -260,10 +290,24 @@ def get_station_detail(station_id: str):
     }
 
 
+@app.post("/api/stations/{station_id}/reset")
+def reset_station_pipeline(station_id: str):
+    """Resets the streaming state and pipeline cache for an AWS station to restore nominal operation."""
+    station_pipelines.pop(station_id, None)
+    return {"status": "reset_successful", "station_id": station_id}
+
+
 @app.post("/api/pipeline/evaluate")
 def evaluate_reading(req: EvaluateRequest):
     """Processes a reading through the full multi-tier SkyGuard AI pipeline."""
     pipe = get_or_create_pipeline(req.station_id, req.station_name)
+    enriched_neighbors, neighbor_tel = compute_enriched_neighbors(
+        req.station_id, req.temperature, req.pressure, req.humidity
+    )
+    target_telemetry = get_station_telemetry(req.station_id, limit=1)
+    is_precip = target_telemetry[-1].get("is_precipitating") if target_telemetry else None
+    rain_val = target_telemetry[-1].get("rain_mm") if target_telemetry else None
+
     reading = SensorReading(
         timestamp=req.timestamp,
         station_id=req.station_id,
@@ -274,10 +318,14 @@ def evaluate_reading(req: EvaluateRequest):
         pressure=req.pressure,
         humidity=req.humidity,
         battery_voltage=12.6,
+        is_precipitating=is_precip,
+        rain_mm=rain_val,
     )
-    result = pipe.process(reading)
+    result = pipe.process(reading, neighbor_telemetry=neighbor_tel)
     update_station_status_cache(req.station_id, result)
-    return result.to_dict()
+    res_dict = result.to_dict()
+    res_dict["nearest_neighbors"] = enriched_neighbors
+    return res_dict
 
 
 @app.post("/api/simulate/inject")
@@ -312,6 +360,12 @@ def inject_anomaly_and_evaluate(req: AnomalyInjectRequest):
     elif "RANGE" in a_type:
         t = 64.5
 
+    enriched_neighbors, neighbor_tel = compute_enriched_neighbors(req.station_id, t, p, h)
+
+    target_telemetry = get_station_telemetry(req.station_id, limit=1)
+    is_precip = target_telemetry[-1].get("is_precipitating") if target_telemetry else None
+    rain_val = target_telemetry[-1].get("rain_mm") if target_telemetry else None
+
     reading = SensorReading(
         timestamp=req.timestamp,
         station_id=req.station_id,
@@ -322,10 +376,14 @@ def inject_anomaly_and_evaluate(req: AnomalyInjectRequest):
         pressure=p,
         humidity=h,
         battery_voltage=batt,
+        is_precipitating=is_precip,
+        rain_mm=rain_val,
     )
-    result = pipe.process(reading)
+    result = pipe.process(reading, neighbor_telemetry=neighbor_tel)
     update_station_status_cache(req.station_id, result)
-    return result.to_dict()
+    res_dict = result.to_dict()
+    res_dict["nearest_neighbors"] = enriched_neighbors
+    return res_dict
 
 
 @app.post("/api/simulate/custom")
@@ -390,6 +448,12 @@ def inject_custom_user_anomaly(req: CustomAnomalyRequest):
         t = (t or 25.0) - 9.4
         p = (p or 1000.0) - 18.2
 
+    enriched_neighbors, neighbor_tel = compute_enriched_neighbors(req.station_id, t, p, h)
+
+    target_telemetry = get_station_telemetry(req.station_id, limit=1)
+    is_precip = target_telemetry[-1].get("is_precipitating") if target_telemetry else None
+    rain_val = target_telemetry[-1].get("rain_mm") if target_telemetry else None
+
     reading = SensorReading(
         timestamp=req.timestamp,
         station_id=req.station_id,
@@ -400,10 +464,14 @@ def inject_custom_user_anomaly(req: CustomAnomalyRequest):
         pressure=p,
         humidity=h,
         battery_voltage=batt,
+        is_precipitating=is_precip,
+        rain_mm=rain_val,
     )
-    result = pipe.process(reading)
+    result = pipe.process(reading, neighbor_telemetry=neighbor_tel)
     update_station_status_cache(req.station_id, result)
-    return result.to_dict()
+    res_dict = result.to_dict()
+    res_dict["nearest_neighbors"] = enriched_neighbors
+    return res_dict
 
 
 @app.get("/api/stations/{station_id}/satellite")

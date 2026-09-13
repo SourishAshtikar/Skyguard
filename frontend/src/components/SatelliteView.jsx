@@ -38,9 +38,9 @@ export default function SatelliteView({
   if (!station) return null;
 
   const sat = satelliteData || latestResult?.satellite_cross_check;
-  const currentTemp = telemetry?.length ? telemetry[telemetry.length - 1].temperature : 28.5;
-  const currentPres = telemetry?.length ? telemetry[telemetry.length - 1].pressure : 1008.0;
-  const currentHumi = telemetry?.length ? telemetry[telemetry.length - 1].humidity : 65.0;
+  const currentTemp = latestResult?.raw_reading?.temperature ?? (telemetry?.length ? telemetry[telemetry.length - 1].temperature : 28.5);
+  const currentPres = latestResult?.raw_reading?.pressure ?? (telemetry?.length ? telemetry[telemetry.length - 1].pressure : 1008.0);
+  const currentHumi = latestResult?.raw_reading?.humidity ?? (telemetry?.length ? telemetry[telemetry.length - 1].humidity : 65.0);
 
   const satId          = sat?.satellite_id || 'INSAT-3DR';
   const satLst         = sat?.land_surface_temp_c ?? (currentTemp != null ? currentTemp + 1.2 : 29.7);

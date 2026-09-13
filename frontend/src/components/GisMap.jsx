@@ -49,7 +49,7 @@ function MapController({ selectedStation, isMapClickRef }) {
 }
 
 // Custom on-map zoom buttons (never hijacks user position)
-function MapControls() {
+function MapControls({ totalStations = 900 }) {
   const map = useMap();
   return (
     <div
@@ -79,8 +79,8 @@ function MapControls() {
       </button>
       <button
         className="glass-card map-ctrl-btn"
-        onClick={() => map.flyTo([22.8, 79.5], 5, { duration: 0.8 })}
-        title="Reset India Center"
+        onClick={() => map.flyTo([22.5, 82.5], 4.8, { duration: 0.8 })}
+        title="Fit All Indian AWS Stations (Reset Subcontinent View)"
         style={{ color: '#00f0ff' }}
       >
         <Maximize2 size={14} />
@@ -109,7 +109,7 @@ const StationsCanvasLayer = memo(function StationsCanvasLayer({
           <CircleMarker
             key={s.station_id}
             center={[s.latitude, s.longitude]}
-            radius={isSelected ? 7 : 4.5}
+            radius={isSelected ? 8 : 4.5}
             pathOptions={{
               color: isSelected ? '#ffffff' : color,
               fillColor: color,
@@ -124,13 +124,20 @@ const StationsCanvasLayer = memo(function StationsCanvasLayer({
             }}
           >
             <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
-              <div style={{ fontSize: '11px', lineHeight: '1.4', fontFamily: 'var(--font-body)' }}>
+              <div style={{ fontSize: '11px', lineHeight: '1.4', fontFamily: 'var(--font-body)', minWidth: '150px' }}>
                 <strong style={{ color: '#00f0ff' }}>{s.station_name}</strong>
                 <div style={{ color: '#94a3b8', fontSize: '10px' }}>
-                  WMO: {s.station_id} • {s.elevation_m}m
+                  WMO: {s.station_id} • {s.elevation_m ?? 150}m
                 </div>
-                <div style={{ marginTop: '2px', fontWeight: 600, color }}>
-                  Status: {s.status}
+                <div style={{ color: '#c9d1d9', fontSize: '10px' }}>
+                  {s.state || 'India'}
+                </div>
+                <div style={{ marginTop: '3px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, color, fontSize: '10px' }}>{s.status}</span>
+                  <span style={{ color: '#8b949e', fontSize: '10px' }}>Health: {Math.round(s.health_score ?? 98)}%</span>
+                </div>
+                <div style={{ marginTop: '3px', fontSize: '9px', color: '#58a6ff', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2px' }}>
+                  Click to inspect & run models →
                 </div>
               </div>
             </Tooltip>
@@ -235,6 +242,35 @@ export default function GisMap({
           />
         )}
       </MapContainer>
+
+      {/* Top-Right Active AWS Observatories Counter Badge */}
+      <div
+        className="glass-panel"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          padding: '6px 14px',
+          zIndex: 1000,
+          fontSize: '11px',
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'center',
+          backdropFilter: 'blur(20px)',
+          background: 'rgba(5, 5, 8, 0.92)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
+          borderRadius: '6px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.8)',
+        }}
+      >
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3fb950', boxShadow: '0 0 8px #3fb950' }} />
+        <span style={{ color: '#f0f6fc', fontWeight: 600 }}>
+          {stations.length} AWS Stations Rendered
+        </span>
+        <span style={{ color: '#8b949e', fontSize: '10px' }}>
+          • IMD National Mesonet GIS
+        </span>
+      </div>
 
       {/* Mesonet Spatial Status Legend */}
       <div

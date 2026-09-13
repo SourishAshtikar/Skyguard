@@ -100,26 +100,83 @@ export default function TelemetryHUD({
   const rawBatt = latestResult?.raw_reading?.battery_voltage ?? 12.6;
   const isAnomaly = latestResult?.final_anomaly ?? false;
 
-  // Check specific sensor fault flags
+  // Check specific sensor fault flags across Tier 1, Spatial, Kalman, and Category
   const rulesFired = latestResult?.tier1?.rules_fired || [];
-  const anomCategory = latestResult?.anomaly_category || '';
+  const ruleResults = latestResult?.tier1?.rule_results || [];
+  const anomCategory = (latestResult?.anomaly_category || '').toUpperCase();
 
-  const isTempAnom = isAnomaly && (
-    rulesFired.some(r => r.includes('TEMP') || r === 'STEP_CHECK' || (r === 'RANGE_CHECK' && rawTemp != null && (rawTemp > 55.0 || rawTemp < -30.0))) ||
-    anomCategory === 'SPIKE' ||
-    (rawTemp != null && (rawTemp > 55.0 || rawTemp < -30.0))
-  );
+  // Pressure anomaly detection
+  const presRuleFailed = ruleResults.some(r => !r.passed && (
+    (r.evidence && r.evidence.pres_delta != null && Math.abs(r.evidence.pres_delta) > 4.5) ||
+    (r.evidence && r.evidence.pres_persist != null && r.evidence.pres_persist >= 6) ||
+    (r.evidence && r.evidence.pres != null && (r.evidence.pres < 500 || r.evidence.pres > 1080)) ||
+    (r.evidence && Array.isArray(r.evidence.missing_sensors) && r.evidence.missing_sensors.includes('pressure')) ||
+    (r.message && r.message.toLowerCase().includes('pres'))
+  ));
+  const isPresSpatialFault = latestResult?.spatial_consensus?.target_deviation_pres != null && latestResult.spatial_consensus.target_deviation_pres > 4.5;
+  const isPresKalmanFault = latestResult?.stage1_forecast?.residual_pres != null && Math.abs(latestResult.stage1_forecast.residual_pres) > 4.0;
+  const isPresCategory = anomCategory.includes('DRIFT');
 
   const isPresAnom = isAnomaly && (
-    rulesFired.some(r => r.includes('PRES') || (r === 'RANGE_CHECK' && rawPres != null && (rawPres > 1080.0 || rawPres < 500.0))) ||
-    anomCategory === 'CALIBRATION_DRIFT' ||
+    rawPres == null ||
+    presRuleFailed ||
+    isPresSpatialFault ||
+    isPresKalmanFault ||
+    isPresCategory ||
+    anomCategory === 'COMMUNICATION_DROPOUT' ||
+    anomCategory === 'PACKET_CORRUPTION' ||
     (rawPres != null && (rawPres > 1080.0 || rawPres < 500.0))
   );
 
+  // Humidity anomaly detection
+  const humiRuleFailed = ruleResults.some(r => !r.passed && (
+    (r.evidence && r.evidence.humi_delta != null && Math.abs(r.evidence.humi_delta) > 20.0) ||
+    (r.evidence && r.evidence.humi_persist != null && r.evidence.humi_persist >= 6) ||
+    (r.evidence && r.evidence.humi != null && (r.evidence.humi < 0 || r.evidence.humi > 100)) ||
+    (r.evidence && Array.isArray(r.evidence.missing_sensors) && r.evidence.missing_sensors.includes('humidity')) ||
+    (r.message && r.message.toLowerCase().includes('humi')) ||
+    r.rule_name === 'DEW_POINT_INVARIANT' ||
+    r.rule_name === 'RAIN_THERMAL_INCONSISTENCY'
+  ));
+  const isHumiSpatialFault = latestResult?.spatial_consensus?.target_deviation_humi != null && latestResult.spatial_consensus.target_deviation_humi > 25.0;
+  const isHumiKalmanFault = latestResult?.stage1_forecast?.residual_humi != null && Math.abs(latestResult.stage1_forecast.residual_humi) > 15.0;
+
   const isHumiAnom = isAnomaly && (
-    rulesFired.some(r => r.includes('HUMI') || (r === 'RANGE_CHECK' && rawHumi != null && (rawHumi > 100.0 || rawHumi < 0.0))) ||
-    (rawHumi != null && (rawHumi > 100.0 || rawHumi < 0.0)) ||
-    (anomCategory === 'FROZEN_SENSOR' && rulesFired.some(r => r.includes('HUMI')))
+    rawHumi == null ||
+    humiRuleFailed ||
+    isHumiSpatialFault ||
+    isHumiKalmanFault ||
+    (anomCategory === 'FROZEN_SENSOR' && (rulesFired.includes('PERSISTENCE_CHECK') || humiRuleFailed)) ||
+    anomCategory === 'PHYSICAL_INCONSISTENCY' ||
+    anomCategory === 'COMMUNICATION_DROPOUT' ||
+    anomCategory === 'PACKET_CORRUPTION' ||
+    (rawHumi != null && (rawHumi > 100.0 || rawHumi < 0.0))
+  );
+
+  // Temperature anomaly detection
+  const tempRuleFailed = ruleResults.some(r => !r.passed && (
+    (r.evidence && r.evidence.temp_delta != null && Math.abs(r.evidence.temp_delta) > 4.5) ||
+    (r.evidence && r.evidence.temp_persist != null && r.evidence.temp_persist >= 6) ||
+    (r.evidence && r.evidence.temp != null && (r.evidence.temp < -40 || r.evidence.temp > 55)) ||
+    (r.evidence && Array.isArray(r.evidence.missing_sensors) && r.evidence.missing_sensors.includes('temperature')) ||
+    (r.message && r.message.toLowerCase().includes('temp')) ||
+    r.rule_name === 'SEASONAL_RANGE_CHECK' ||
+    r.rule_name === 'RAIN_THERMAL_INCONSISTENCY'
+  ));
+  const isTempSpatialFault = latestResult?.spatial_consensus?.target_deviation_temp != null && latestResult.spatial_consensus.target_deviation_temp > 6.0;
+  const isTempKalmanFault = latestResult?.stage1_forecast?.residual_temp != null && Math.abs(latestResult.stage1_forecast.residual_temp) > 4.0;
+
+  const isTempAnom = isAnomaly && (
+    rawTemp == null ||
+    tempRuleFailed ||
+    isTempSpatialFault ||
+    isTempKalmanFault ||
+    anomCategory === 'SENSOR_SPIKE' ||
+    anomCategory === 'RANGE_VIOLATION' ||
+    anomCategory === 'PHYSICAL_INCONSISTENCY' ||
+    anomCategory === 'COMMUNICATION_DROPOUT' ||
+    anomCategory === 'PACKET_CORRUPTION' ||
+    (rawTemp != null && (rawTemp > 55.0 || rawTemp < -30.0))
   );
 
   // Reconstructed / Imputed Values from backend models
@@ -129,7 +186,7 @@ export default function TelemetryHUD({
     latestResult?.stage1_forecast?.predicted_temp ??
     latestResult?.stage1_forecast?.predicted?.temp ??
     latestResult?.spatial_consensus?.median_temp ??
-    rawTemp;
+    (rawTemp ?? 27.8);
 
   let corrPres =
     latestResult?.corrected_telemetry?.pressure ??
@@ -137,7 +194,7 @@ export default function TelemetryHUD({
     latestResult?.stage1_forecast?.predicted_pres ??
     latestResult?.stage1_forecast?.predicted?.pres ??
     latestResult?.spatial_consensus?.median_pres ??
-    rawPres;
+    (rawPres ?? 1012.0);
 
   let corrHumi =
     latestResult?.corrected_telemetry?.humidity ??
@@ -145,16 +202,16 @@ export default function TelemetryHUD({
     latestResult?.stage1_forecast?.predicted_humi ??
     latestResult?.stage1_forecast?.predicted?.humi ??
     latestResult?.spatial_consensus?.median_humi ??
-    rawHumi;
+    (rawHumi ?? 65.0);
 
   // Realistic fallback replacements ONLY for faulted parameters if model forecast was identical
-  if (isTempAnom && (corrTemp == null || Math.abs(corrTemp - rawTemp) < 0.2)) {
+  if (isTempAnom && (corrTemp == null || (rawTemp != null && Math.abs(corrTemp - rawTemp) < 0.2))) {
     corrTemp = rawTemp != null ? (rawTemp < 20 ? rawTemp + 14.2 : (rawTemp > 40 ? rawTemp - 16.5 : rawTemp - 4.2)) : 27.8;
   }
-  if (isHumiAnom && (corrHumi == null || Math.abs(corrHumi - rawHumi) < 0.2)) {
+  if (isHumiAnom && (corrHumi == null || (rawHumi != null && Math.abs(corrHumi - rawHumi) < 0.2))) {
     corrHumi = rawHumi != null ? Math.min(100.0, Math.max(1.0, (rawHumi > 88 ? rawHumi - 28.5 : (rawHumi < 20 ? rawHumi + 32.0 : rawHumi - 14.0)))) : 62.5;
   }
-  if (isPresAnom && (corrPres == null || Math.abs(corrPres - rawPres) < 0.2)) {
+  if (isPresAnom && (corrPres == null || (rawPres != null && Math.abs(corrPres - rawPres) < 0.2))) {
     corrPres = rawPres != null ? (rawPres > 1025 ? rawPres - 8.5 : (rawPres < 980 ? rawPres + 10.0 : rawPres - 8.5)) : 1012.0;
   }
 
@@ -172,6 +229,40 @@ export default function TelemetryHUD({
   const qcFlag = latestResult?.wmo_qc_flag ?? (isAnomaly ? 2 : 0);
   const qcLabels = ['Flag 0: Good', 'Flag 1: Suspect', 'Flag 2: Erroneous', 'Flag 3: Missing', 'Flag 4: Imputed'];
   const qcColors = ['#3fb950', '#d29922', '#f85149', '#8b949e', '#58a6ff'];
+
+  const getMitigationAction = () => {
+    if (!isAnomaly) {
+      return 'Nominal: Sensor operating within standard WMO parameters. No action required.';
+    }
+    const cat = (latestResult?.anomaly_category || '').toUpperCase();
+    const rules = latestResult?.tier1?.rules_fired || [];
+
+    if (cat.includes('FROZEN') || rules.includes('PERSISTENCE_CHECK')) {
+      return 'Transducer Latchup / Serial Freeze: Inspect sensor transducer for physical debris, dead insect ingress, or ADC serial bus freeze. Power-cycle data logger and deploy Kalman self-healing imputation.';
+    }
+    if (cat.includes('SPIKE')) {
+      return 'Transient Signal Spike: Inspect signal cabling shielding, lightning surge protector (SPD), and RS-485 / Modbus bus grounding. Verify RTD 4-wire bridge resistance.';
+    }
+    if (cat.includes('DRIFT')) {
+      return 'Zero-Point Calibration Drift: Schedule barometric/hygrometric recalibration against certified WMO traveling standard. Transducer baseline offset detected.';
+    }
+    if (cat.includes('DROPOUT') || rules.includes('MISSING_DATA_CHECK')) {
+      return 'Telemetry Transmission Dropout: Inspect solar panel charge controller, battery state-of-charge (<11.2V threshold), SIM card GPRS/INSAT-3A transmitter connection, and RF antenna alignment.';
+    }
+    if (cat.includes('CORRUPTION')) {
+      return 'Payload Framing Corruption: Inspect UART/RS-485 parity bit configuration, verify baud rate synchronization, and check modem CRC integrity.';
+    }
+    if (cat.includes('PHYSICAL') || rules.includes('DEW_POINT_INVARIANT') || rules.includes('RAIN_THERMAL_INCONSISTENCY')) {
+      return 'Thermodynamic Physical Breach: Replace capacitive polymer humidity sensor element or inspect 4-wire RTD resistance bridge. Active evaporative cooling / saturation bounds violated.';
+    }
+    if (cat.includes('RANGE') || rules.includes('RANGE_CHECK') || rules.includes('SEASONAL_RANGE_CHECK')) {
+      return 'Climatological Range Violation: Inspect transducer for open-circuit / short-circuit condition and ADC rail saturation. Seasonal monsoonal thermal ceiling exceeded.';
+    }
+    if (cat.includes('SPATIAL') || (latestResult?.spatial_consensus && latestResult.spatial_consensus.is_spatially_inconsistent)) {
+      return 'Localized Mesonet Discrepancy: Station diverges significantly from peer mesonet network. Inspect local site obstructions, microclimate shading, and recalibrate.';
+    }
+    return latestResult?.sensor_health?.action || 'Isolate transducer, verify excitation voltage, and deploy automated Kalman self-healing imputation.';
+  };
 
   // Format telemetry series for chart
   const chartData = telemetry.map((item, idx) => {
@@ -730,7 +821,7 @@ export default function TelemetryHUD({
                   <span>5. Recommended Maintenance &amp; Mitigation Action</span>
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#f0f6fc', lineHeight: '1.4' }}>
-                  {latestResult?.sensor_health?.action || 'Inspect signal cabling, lightning surge protector (SPD), verify transducer excitation voltage, and deploy Kalman self-healing imputation.'}
+                  {getMitigationAction()}
                 </div>
               </div>
             </div>

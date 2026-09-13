@@ -5,7 +5,7 @@ Latency budget: < 0.2 ms on modern x86 / < 1 ms on ESP32.
 """
 
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional, Union
 import numpy as np
 
 from skyguard.config.contracts import QCStatus, Severity, Tier1Output
@@ -24,13 +24,32 @@ class Tier1Engine:
         pres: Optional[float],
         humi: Optional[float],
         features: Dict[str, float],
+        latitude: Optional[float] = None,
+        timestamp: Optional[Any] = None,
+        is_precipitating: Optional[bool] = None,
     ) -> Tier1Output:
         """Executes all Tier 1 QC rules on the current reading and engineered features."""
         t0 = time.perf_counter()
 
+        lat = latitude if latitude is not None else (features.get("latitude") if features else 20.0)
+        
+        # Determine month for seasonal climatological check
+        month = None
+        if timestamp:
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+                month = dt.month
+            except Exception:
+                pass
+        if month is None and features and "month" in features:
+            month = int(features["month"])
+
         results = [
             self.rules.check_missing(temp, pres, humi),
             self.rules.check_range(temp, pres, humi),
+            self.rules.check_seasonal_range(temp, pres, humi, latitude=lat, month=month, features=features),
+            self.rules.check_rain_thermal_consistency(temp, humi, features=features, is_precipitating=is_precipitating),
             self.rules.check_step(features),
             self.rules.check_persistence(features),
             self.rules.check_dew_point_consistency(features),

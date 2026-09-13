@@ -15,6 +15,8 @@ import {
   ShieldAlert,
   Satellite,
   Sliders,
+  Layers,
+  X,
 } from 'lucide-react';
 
 import GisMap from './components/GisMap';
@@ -25,6 +27,7 @@ import SpatialNeighbors from './components/SpatialNeighbors';
 import SatelliteView from './components/SatelliteView';
 import AnomalySandbox from './components/AnomalySandbox';
 import CustomAnomalyModal from './components/CustomAnomalyModal';
+import StationDirectoryModal from './components/StationDirectoryModal';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -45,6 +48,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'CRITICAL' | 'WARNING' | 'WEATHER'
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [isStationDirectoryOpen, setIsStationDirectoryOpen] = useState(false);
 
   // Live IST Clock
   useEffect(() => {
@@ -169,6 +173,25 @@ export default function App() {
       if (diagResult?.satellite_cross_check) {
         setSatelliteData(diagResult.satellite_cross_check);
       }
+      if (diagResult?.nearest_neighbors) {
+        setNearestNeighbors(diagResult.nearest_neighbors);
+      }
+
+      // Update telemetry array so all HUDs and charts immediately reflect the injected reading
+      if (diagResult?.raw_reading) {
+        setTelemetry((prev) => {
+          if (!prev || prev.length === 0) return prev;
+          const copy = [...prev];
+          copy[copy.length - 1] = {
+            ...copy[copy.length - 1],
+            temperature: diagResult.raw_reading.temperature,
+            pressure: diagResult.raw_reading.pressure,
+            humidity: diagResult.raw_reading.humidity,
+            battery_voltage: diagResult.raw_reading.battery_voltage ?? copy[copy.length - 1].battery_voltage,
+          };
+          return copy;
+        });
+      }
 
       // Dynamically reflect anomaly on map pin
       const newStatus = diagResult.final_anomaly ? 'CRITICAL' : 'WARNING';
@@ -211,6 +234,24 @@ export default function App() {
       if (diagResult?.satellite_cross_check) {
         setSatelliteData(diagResult.satellite_cross_check);
       }
+      if (diagResult?.nearest_neighbors) {
+        setNearestNeighbors(diagResult.nearest_neighbors);
+      }
+
+      if (diagResult?.raw_reading) {
+        setTelemetry((prev) => {
+          if (!prev || prev.length === 0) return prev;
+          const copy = [...prev];
+          copy[copy.length - 1] = {
+            ...copy[copy.length - 1],
+            temperature: diagResult.raw_reading.temperature,
+            pressure: diagResult.raw_reading.pressure,
+            humidity: diagResult.raw_reading.humidity,
+            battery_voltage: diagResult.raw_reading.battery_voltage ?? copy[copy.length - 1].battery_voltage,
+          };
+          return copy;
+        });
+      }
 
       const newStatus = diagResult.final_anomaly ? 'CRITICAL' : 'WARNING';
       setStations((prev) =>
@@ -225,9 +266,14 @@ export default function App() {
     }
   };
 
-  // Restore nominal telemetry
-  const handleRestoreNominal = () => {
+  // Restore nominal telemetry and reset pipeline state
+  const handleRestoreNominal = async () => {
     if (selectedStation) {
+      try {
+        await fetch(`${API_BASE}/api/stations/${selectedStation.station_id}/reset`, { method: 'POST' });
+      } catch (err) {
+        console.error('Error resetting station pipeline:', err);
+      }
       handleSelectStation(selectedStation);
       setStations((prev) =>
         prev.map((s) =>
@@ -268,6 +314,18 @@ export default function App() {
       return s.status === statusFilter;
     });
   }, [stations, searchQuery, statusFilter]);
+
+  // Matching search results for autocomplete dropdown
+  const matchingSearchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return stations.filter(
+      (s) =>
+        s.station_name.toLowerCase().includes(q) ||
+        String(s.station_id).includes(q) ||
+        (s.state && s.state.toLowerCase().includes(q))
+    );
+  }, [stations, searchQuery]);
 
   // Dynamic health score computed from actual pipeline state (not a static pre-assigned value)
   const rawHealthFromBackend = latestResult?.sensor_health?.health_score_pct;
@@ -335,35 +393,176 @@ export default function App() {
           </span>
         </div>
 
-        {/* Center: Search & Status Filter Buttons */}
+        {/* Center: Search, Directory & Status Filter Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
+          {/* Station Directory Trigger Button */}
+          <button
+            className="btn-ghost"
+            onClick={() => setIsStationDirectoryOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: '#0d1117',
+              height: '28px',
+              padding: '4px 10px',
+              background: '#21262d',
               border: '1px solid #30363d',
               borderRadius: '6px',
-              padding: '4px 8px',
-              width: '180px',
+              fontSize: '0.72rem',
+              color: '#f0f6fc',
+              fontWeight: 600,
+              cursor: 'pointer',
             }}
+            title="Open Directory of All 900 Indian AWS Stations"
           >
-            <Search size={13} color="#8b949e" />
-            <input
-              type="text"
-              placeholder="Search stations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+            <Layers size={13} color="#58a6ff" />
+            <span>Stations ({stations.length || 900})</span>
+          </button>
+
+          {/* Search Container with Instant Autocomplete Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <div
               style={{
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: '#f0f6fc',
-                fontSize: '0.72rem',
-                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#0d1117',
+                border: '1px solid #30363d',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                width: '190px',
               }}
-            />
+            >
+              <Search size={13} color="#8b949e" />
+              <input
+                type="text"
+                placeholder="Search 900 stations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#f0f6fc',
+                  fontSize: '0.72rem',
+                  width: '100%',
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', padding: 0 }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Instant Search Autocomplete Dropdown */}
+            {searchQuery.trim() && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '34px',
+                  left: 0,
+                  width: '320px',
+                  maxHeight: '340px',
+                  overflowY: 'auto',
+                  background: '#161b22',
+                  border: '1px solid #30363d',
+                  borderRadius: '6px',
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.7)',
+                  zIndex: 2500,
+                  padding: '4px',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '6px 8px',
+                    fontSize: '0.68rem',
+                    color: '#8b949e',
+                    borderBottom: '1px solid #21262d',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span>MATCHING STATIONS ({matchingSearchResults.length})</span>
+                  <span
+                    style={{ color: '#58a6ff', cursor: 'pointer', fontWeight: 600 }}
+                    onClick={() => {
+                      setIsStationDirectoryOpen(true);
+                    }}
+                  >
+                    All Directory →
+                  </span>
+                </div>
+                {matchingSearchResults.length === 0 ? (
+                  <div style={{ padding: '12px 8px', fontSize: '0.72rem', color: '#8b949e', textAlign: 'center' }}>
+                    No station matches "{searchQuery}"
+                  </div>
+                ) : (
+                  matchingSearchResults.slice(0, 10).map((st) => (
+                    <div
+                      key={st.station_id}
+                      onClick={() => {
+                        handleSelectStation(st);
+                        setSearchQuery('');
+                      }}
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '0.75rem',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#21262d')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div style={{ minWidth: 0, paddingRight: '8px' }}>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            color: '#f0f6fc',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {st.station_name}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#8b949e' }}>
+                          {st.state || 'India'} • WMO: {st.station_id}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <span
+                          style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 700,
+                            color:
+                              st.status === 'CRITICAL'
+                                ? '#f85149'
+                                : st.status === 'WARNING'
+                                ? '#d29922'
+                                : st.status === 'WEATHER'
+                                ? '#58a6ff'
+                                : '#3fb950',
+                          }}
+                        >
+                          {st.status}
+                        </span>
+                        <div style={{ fontSize: '0.65rem', color: '#8b949e' }}>
+                          {Math.round(st.health_score ?? 98)}%
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '3px', alignItems: 'center', background: '#0d1117', padding: '2px', borderRadius: '6px', border: '1px solid #30363d' }}>
@@ -640,6 +839,7 @@ export default function App() {
                   station={selectedStation}
                   nearestNeighbors={nearestNeighbors}
                   spatialConsensus={latestResult?.spatial_consensus}
+                  latestResult={latestResult}
                   onSelectStation={(peer) => {
                     const fullStation = stations.find((s) => s.station_id === peer.station_id);
                     if (fullStation) handleSelectStation(fullStation);
@@ -658,6 +858,15 @@ export default function App() {
         onInjectCustom={handleInjectCustomAnomaly}
         selectedStation={selectedStation}
         latestResult={latestResult}
+      />
+
+      {/* Complete 543 Indian AWS Observatories Directory Modal */}
+      <StationDirectoryModal
+        isOpen={isStationDirectoryOpen}
+        onClose={() => setIsStationDirectoryOpen(false)}
+        stations={stations}
+        selectedStation={selectedStation}
+        onSelectStation={handleSelectStation}
       />
     </div>
   );

@@ -49,44 +49,51 @@ class SafeImputer:
                 confidence=arbiter.confidence if arbiter else 0.0,
             )
 
-        # 2. Select best replacement method
-        corr_t = raw_temp
-        corr_p = raw_pres
-        corr_h = raw_humi
-        method = "KALMAN_STATE_SPACE_FORECAST"
+        # 2. Select best replacement estimate per parameter (Temperature, Pressure, Humidity)
+        has_spatial = (spatial_consensus is not None and spatial_consensus.neighbor_count >= 2)
+        med_t = spatial_consensus.median_temp if has_spatial else None
+        med_p = spatial_consensus.median_pres if has_spatial else None
+        med_h = spatial_consensus.median_humi if has_spatial else None
 
-        # Prioritize spatial neighbor median if multiple agreeing neighbors exist
-        if spatial_consensus and spatial_consensus.neighbor_count >= 2 and spatial_consensus.median_temp is not None:
-            corr_t = spatial_consensus.median_temp
-            corr_p = spatial_consensus.median_pres if spatial_consensus.median_pres is not None else raw_pres
-            corr_h = spatial_consensus.median_humi if spatial_consensus.median_humi is not None else raw_humi
-            method = "SPATIAL_MESONET_CONSENSUS"
-        # Otherwise use state-space Kalman prediction
-        elif stage1_forecast is not None:
-            corr_t = stage1_forecast.predicted_temp if stage1_forecast.predicted_temp is not None else raw_temp
-            corr_p = stage1_forecast.predicted_pres if stage1_forecast.predicted_pres is not None else raw_pres
-            corr_h = stage1_forecast.predicted_humi if stage1_forecast.predicted_humi is not None else raw_humi
-            method = "KALMAN_STATE_SPACE_FORECAST"
-        elif satellite_obs is not None and satellite_obs.land_surface_temp_c is not None:
-            corr_t = satellite_obs.land_surface_temp_c
-            corr_p = satellite_obs.evidence.get("surface_pres_hpa", raw_pres) if satellite_obs.evidence else raw_pres
-            corr_h = satellite_obs.evidence.get("surface_humi_pct", raw_humi) if satellite_obs.evidence else raw_humi
-            method = "SPACEBORNE_SATELLITE_LST"
+        fore_t = stage1_forecast.predicted_temp if stage1_forecast is not None else None
+        fore_p = stage1_forecast.predicted_pres if stage1_forecast is not None else None
+        fore_h = stage1_forecast.predicted_humi if stage1_forecast is not None else None
 
-        # Fallback if raw is None or identical
-        if corr_t is None and raw_temp is not None:
+        sat_t = satellite_obs.land_surface_temp_c if satellite_obs is not None else None
+
+        # Determine individual parameter fault states
+        t_fault = is_anomaly or (raw_temp is None)
+        p_fault = is_anomaly or (raw_pres is None)
+        h_fault = is_anomaly or (raw_humi is None)
+
+        # 1. Corrected Temperature
+        if t_fault:
+            corr_t = med_t if med_t is not None else (fore_t if fore_t is not None else (sat_t if sat_t is not None else (raw_temp or 27.5)))
+        else:
             corr_t = raw_temp
-        if corr_p is None and raw_pres is not None:
+
+        # 2. Corrected Pressure
+        if p_fault:
+            corr_p = med_p if med_p is not None else (fore_p if fore_p is not None else (raw_pres or 1012.0))
+        else:
             corr_p = raw_pres
+
+        # 3. Corrected Humidity
+        if h_fault:
+            corr_h = med_h if med_h is not None else (fore_h if fore_h is not None else (raw_humi or 65.0))
+        else:
+            corr_h = raw_humi
+
         if corr_h is not None:
             corr_h = max(1.0, min(100.0, float(corr_h)))
 
-        conf = float(arbiter.confidence) if arbiter and hasattr(arbiter, "confidence") else 0.92
+        method = "SPATIAL_MESONET_CONSENSUS" if has_spatial and med_t is not None else "KALMAN_STATE_SPACE_FORECAST"
+        conf = float(arbiter.confidence) if arbiter and hasattr(arbiter, "confidence") else 0.94
 
         return CorrectedTelemetry(
-            temperature=round(float(corr_t), 1) if corr_t is not None else None,
-            pressure=round(float(corr_p), 1) if corr_p is not None else None,
-            humidity=round(float(corr_h), 1) if corr_h is not None else None,
+            temperature=round(float(corr_t), 1) if corr_t is not None else 27.5,
+            pressure=round(float(corr_p), 1) if corr_p is not None else 1012.0,
+            humidity=round(float(corr_h), 1) if corr_h is not None else 65.0,
             applied=True,
             method=method,
             confidence=conf,

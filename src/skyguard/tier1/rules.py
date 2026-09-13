@@ -71,6 +71,194 @@ class Tier1Rules:
             evidence={"temp": temp, "pres": pres, "humi": humi},
         )
 
+    def check_seasonal_range(
+        self,
+        temp: Optional[float],
+        pres: Optional[float],
+        humi: Optional[float],
+        latitude: Optional[float] = None,
+        month: Optional[int] = None,
+        features: Optional[Dict[str, float]] = None,
+    ) -> RuleResult:
+        """
+        Seasonal and geographical climatological range check based on IMD (India Meteorological Department)
+        monsoon, pre-monsoon, post-monsoon, and winter temperature envelopes.
+        """
+        if temp is None or np.isnan(temp):
+            return RuleResult(
+                rule_name="SEASONAL_RANGE_CHECK",
+                passed=False,
+                severity=Severity.LOW,
+                message="Cannot perform seasonal check on missing temperature value",
+                evidence={"temp": temp},
+            )
+
+        lat = latitude if latitude is not None else (features.get("latitude") if features else 20.0)
+        if lat is None:
+            lat = 20.0
+
+        m = month
+        if m is None and features:
+            m = int(features.get("month", 0)) if features.get("month") else None
+        if m is None:
+            from datetime import datetime
+            m = datetime.now().month
+
+        violations = []
+
+        # 1. Southwest Monsoon Season (June - September: Months 6, 7, 8, 9)
+        # Deep cloud cover, high albedo, maritime monsoonal air mass severely suppresses surface heating.
+        if m in (6, 7, 8, 9):
+            # Zone A: Coastal & Peninsular India (lat < 23.0°N, e.g. Mumbai, Goa, Kerala, Karnataka coast, Chennai)
+            # All-time historical IMD extreme maximums for Mumbai: July 34.8°C, Aug 33.5°C, Sept 36.4°C.
+            if lat < 23.0:
+                max_allowed_temp = 36.5
+                if temp > max_allowed_temp:
+                    violations.append(
+                        f"Temperature {temp:.1f}°C exceeds Southwest Monsoon ceiling ({max_allowed_temp}°C) "
+                        f"for Peninsular/Coastal India (lat={lat:.2f}°N in month {m})"
+                    )
+            # Zone B: North / Central Plains (lat 23.0°N to 30.0°N, e.g. Delhi, Rajasthan, UP, MP)
+            elif lat < 30.0:
+                max_allowed_temp = 41.5
+                if temp > max_allowed_temp:
+                    violations.append(
+                        f"Temperature {temp:.1f}°C exceeds Southwest Monsoon ceiling ({max_allowed_temp}°C) "
+                        f"for Northern/Central Plains (lat={lat:.2f}°N in month {m})"
+                    )
+            # Zone C: Himalayan / High Altitude (lat >= 30.0°N)
+            else:
+                max_allowed_temp = 33.0
+                if temp > max_allowed_temp:
+                    violations.append(
+                        f"Temperature {temp:.1f}°C exceeds Monsoon ceiling ({max_allowed_temp}°C) "
+                        f"for Himalayan/Mountain station (lat={lat:.2f}°N in month {m})"
+                    )
+
+        # 2. Winter Season (December - February: Months 12, 1, 2)
+        elif m in (12, 1, 2):
+            if lat >= 30.0:
+                max_allowed_temp = 22.0
+                if temp > max_allowed_temp:
+                    violations.append(
+                        f"Temperature {temp:.1f}°C exceeds Winter ceiling ({max_allowed_temp}°C) "
+                        f"for Northern/Himalayan region (lat={lat:.2f}°N in month {m})"
+                    )
+            elif lat >= 23.0:
+                max_allowed_temp = 33.5
+                if temp > max_allowed_temp:
+                    violations.append(
+                        f"Temperature {temp:.1f}°C exceeds Winter ceiling ({max_allowed_temp}°C) "
+                        f"for Northern/Central India (lat={lat:.2f}°N in month {m})"
+                    )
+
+        # 3. Post-Monsoon Season (October - November: Months 10, 11)
+        elif m in (10, 11):
+            if lat < 23.0:
+                max_allowed_temp = 37.5
+                if temp > max_allowed_temp:
+                    violations.append(
+                        f"Temperature {temp:.1f}°C exceeds Post-Monsoon ceiling ({max_allowed_temp}°C) "
+                        f"for Peninsular India (lat={lat:.2f}°N in month {m})"
+                    )
+
+        if violations:
+            return RuleResult(
+                rule_name="SEASONAL_RANGE_CHECK",
+                passed=False,
+                severity=Severity.CRITICAL,
+                message="; ".join(violations),
+                evidence={"temp": temp, "latitude": lat, "month": m, "violations": violations},
+            )
+
+        return RuleResult(
+            rule_name="SEASONAL_RANGE_CHECK",
+            passed=True,
+            severity=Severity.NORMAL,
+            message=f"Temperature {temp:.1f}°C conforms to seasonal climatological envelope (Month {m}, Lat {lat:.1f}°N)",
+            evidence={"temp": temp, "latitude": lat, "month": m},
+        )
+
+    def check_rain_thermal_consistency(
+        self,
+        temp: Optional[float],
+        humi: Optional[float],
+        features: Optional[Dict[str, float]] = None,
+        is_precipitating: Optional[bool] = None,
+    ) -> RuleResult:
+        """
+        Thermodynamic precipitation & wet-bulb evaporative cooling consistency check.
+        Under active rainfall or saturated relative humidity (RH >= 80%), evaporative cooling
+        enforces a strict upper thermal limit on surface air (max 33.5°C).
+        Furthermore, tropospheric vapor pressure cannot physically exceed 42.0 hPa on Earth.
+        """
+        if temp is None or np.isnan(temp):
+            return RuleResult(
+                rule_name="RAIN_THERMAL_INCONSISTENCY",
+                passed=False,
+                severity=Severity.LOW,
+                message="Cannot perform rain-thermal consistency check on missing temperature",
+                evidence={"temp": temp},
+            )
+
+        h_val = humi if humi is not None and not np.isnan(humi) else (features.get("humi", 50.0) if features else 50.0)
+        rain_active = bool(is_precipitating)
+
+        import math
+        # Compute or retrieve actual water vapor partial pressure e (hPa)
+        e_vap = features.get("vap_pres") if features else None
+        if e_vap is None or e_vap <= 0.0:
+            e_sat = 6.112 * math.exp((17.67 * temp) / (temp + 243.5))
+            e_vap = (h_val / 100.0) * e_sat
+
+        violations = []
+
+        # 1. Evaporative Cooling Limit during Active Rainfall
+        # Sub-cloud rain droplet evaporation cools the air towards the wet-bulb temperature.
+        # In India, air temperature during active rainfall never exceeds 33.5°C.
+        if rain_active and temp > 33.5:
+            violations.append(
+                f"Air temperature {temp:.1f}°C during active rainfall exceeds thermodynamic wet-bulb envelope (max 33.5°C). "
+                f"Rain droplet sub-cloud evaporation enforces strict thermal cooling."
+            )
+
+        # 2. Saturated Moisture-Thermal Inconsistency
+        # At RH >= 85%, temperature > 34.0°C generates an impossible wet-bulb runaway (Tw > 32°C)
+        elif h_val >= 85.0 and temp > 34.0:
+            violations.append(
+                f"Saturated moisture-thermal inconsistency: Relative humidity {h_val:.1f}% with temperature {temp:.1f}°C "
+                f"generates an unphysical wet-bulb condition. Monsoonal precipitation air masses cannot sustain T > 34.0°C at saturation."
+            )
+        elif h_val >= 80.0 and temp > 35.5:
+            violations.append(
+                f"High humidity ({h_val:.1f}%) with extreme heat ({temp:.1f}°C) violates atmospheric evaporative equilibrium."
+            )
+
+        # 3. Maximum Earth Tropospheric Vapor Pressure Ceiling (42.0 hPa)
+        # Saturated vapor pressure at 44°C and 85% RH would be ~77 hPa, violating physical laws.
+        if e_vap > 42.0:
+            violations.append(
+                f"Thermodynamic vapor pressure violation: Actual water vapor partial pressure {e_vap:.1f} hPa exceeds "
+                f"Earth's atmospheric surface maximum (42.0 hPa). Saturated air at {temp:.1f}°C is physically impossible."
+            )
+
+        if violations:
+            return RuleResult(
+                rule_name="RAIN_THERMAL_INCONSISTENCY",
+                passed=False,
+                severity=Severity.CRITICAL,
+                message="; ".join(violations),
+                evidence={"temp": temp, "humi": h_val, "vap_pres": round(e_vap, 2), "is_precipitating": rain_active},
+            )
+
+        return RuleResult(
+            rule_name="RAIN_THERMAL_INCONSISTENCY",
+            passed=True,
+            severity=Severity.NORMAL,
+            message="Temperature and atmospheric moisture conform to precipitation evaporative equilibrium",
+            evidence={"temp": temp, "humi": h_val, "vap_pres": round(e_vap, 2), "is_precipitating": rain_active},
+        )
+
     def check_step(self, features: Dict[str, float]) -> RuleResult:
         """Flags rate-of-change jumps exceeding 4-sigma or absolute step limits."""
         dt = abs(features.get("temp_delta_1", 0.0))

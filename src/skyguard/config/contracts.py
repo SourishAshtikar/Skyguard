@@ -53,6 +53,8 @@ class SensorReading:
     humidity: Optional[float]     # %
     elevation_m: Optional[float] = None
     battery_voltage: Optional[float] = None
+    is_precipitating: Optional[bool] = None
+    rain_mm: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         ts = self.timestamp.isoformat() if isinstance(self.timestamp, datetime) else str(self.timestamp)
@@ -67,6 +69,8 @@ class SensorReading:
             "humidity": None if self.humidity is None or np.isnan(self.humidity) else float(self.humidity),
             "elevation_m": self.elevation_m,
             "battery_voltage": self.battery_voltage,
+            "is_precipitating": self.is_precipitating,
+            "rain_mm": self.rain_mm,
         }
 
 
@@ -133,8 +137,10 @@ class SpatialConsensusOutput:
     median_pres: Optional[float]
     median_humi: Optional[float]
     target_deviation_temp: float
-    spatial_consensus_score: float  # 0.0 (anomalous deviation) to 1.0 (perfect consensus)
-    is_spatially_inconsistent: bool
+    target_deviation_pres: float = 0.0
+    target_deviation_humi: float = 0.0
+    spatial_consensus_score: float = 1.0  # 0.0 (anomalous deviation) to 1.0 (perfect consensus)
+    is_spatially_inconsistent: bool = False
 
 
 @dataclass
@@ -255,7 +261,15 @@ class DiagnosticResult:
                 "neighbor_ids": self.spatial_consensus.neighbor_ids,
                 "distances_km": self.spatial_consensus.distances_km,
                 "consensus_score": self.spatial_consensus.spatial_consensus_score,
+                "spatial_consensus_score": self.spatial_consensus.spatial_consensus_score,
                 "inconsistent": self.spatial_consensus.is_spatially_inconsistent,
+                "is_spatially_inconsistent": self.spatial_consensus.is_spatially_inconsistent,
+                "target_deviation_temp": self.spatial_consensus.target_deviation_temp,
+                "target_deviation_pres": self.spatial_consensus.target_deviation_pres,
+                "target_deviation_humi": self.spatial_consensus.target_deviation_humi,
+                "median_temp": self.spatial_consensus.median_temp,
+                "median_pres": self.spatial_consensus.median_pres,
+                "median_humi": self.spatial_consensus.median_humi,
             } if self.spatial_consensus else None,
             "satellite_cross_check": {
                 "satellite_id": self.satellite_cross_check.satellite_id,

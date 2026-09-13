@@ -49,7 +49,7 @@ class LiveAWSTelemetryFetcher:
             url = (
                 f"https://api.open-meteo.com/v1/forecast?"
                 f"latitude={latitude:.4f}&longitude={longitude:.4f}"
-                f"&hourly=temperature_2m,relative_humidity_2m,surface_pressure"
+                f"&hourly=temperature_2m,relative_humidity_2m,surface_pressure,rain,precipitation,weather_code"
                 f"&past_days=2&forecast_days=1&timezone=Asia%2FKolkata"
             )
             req = urllib.request.Request(url, headers={"User-Agent": "SkyGuard-AI-Mesonet/1.0"})
@@ -60,20 +60,30 @@ class LiveAWSTelemetryFetcher:
                 temps = hourly.get("temperature_2m", [])
                 humis = hourly.get("relative_humidity_2m", [])
                 press = hourly.get("surface_pressure", [])
+                rains = hourly.get("rain", [])
+                precs = hourly.get("precipitation", [])
+                wcodes = hourly.get("weather_code", [])
 
                 if times and temps:
                     # Current local time cut-off so we only show observations up to now
                     now_iso = datetime.now().strftime("%Y-%m-%dT%H:00")
                     readings = []
-                    for t_str, temp, humi, pres in zip(times, temps, humis, press):
+                    for i, (t_str, temp, humi, pres) in enumerate(zip(times, temps, humis, press)):
                         if t_str > now_iso:
                             break
                         if temp is not None and humi is not None and pres is not None:
+                            r_val = float(rains[i]) if i < len(rains) and rains[i] is not None else 0.0
+                            p_val = float(precs[i]) if i < len(precs) and precs[i] is not None else 0.0
+                            wc_val = int(wcodes[i]) if i < len(wcodes) and wcodes[i] is not None else 0
+                            is_rain = (r_val > 0.05) or (p_val > 0.05) or (wc_val in (51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99))
                             readings.append({
                                 "timestamp": t_str,
                                 "temperature": round(float(temp), 1),
                                 "pressure": round(float(pres), 1),
                                 "humidity": round(float(np.clip(humi, 1.0, 100.0)), 1),
+                                "rain_mm": round(max(r_val, p_val), 1),
+                                "is_precipitating": is_rain,
+                                "weather_code": wc_val,
                                 "battery_voltage": 12.6,
                                 "source": "LIVE_AWS_METAR_FEED",
                             })

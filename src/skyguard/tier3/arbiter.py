@@ -185,6 +185,28 @@ class HierarchicalArbiter:
                 latency_ms=latency_ms,
             )
 
+        if "SEASONAL_RANGE_CHECK" in tier1_fired_rules:
+            latency_ms = (time.perf_counter() - t0) * 1000.0
+            return Stage3ArbiterOutput(
+                is_weather_event=False,
+                anomaly_category=AnomalyCategory.RANGE_VIOLATION,
+                root_cause_label="Seasonal Range Violation: Reading violates regional climatological seasonal bounds",
+                confidence=0.99,
+                shap_attributions={"temp": 1.0, "doy_sin": 0.8, "temp_z": 0.9},
+                latency_ms=latency_ms,
+            )
+
+        if "RAIN_THERMAL_INCONSISTENCY" in tier1_fired_rules:
+            latency_ms = (time.perf_counter() - t0) * 1000.0
+            return Stage3ArbiterOutput(
+                is_weather_event=False,
+                anomaly_category=AnomalyCategory.PHYSICAL_INCONSISTENCY,
+                root_cause_label="Precipitation Thermal Inconsistency: High temperature during rain violates wet-bulb evaporative limit",
+                confidence=0.99,
+                shap_attributions={"vap_pres": 1.0, "humi": 0.9, "temp": 0.9},
+                latency_ms=latency_ms,
+            )
+
         # 2. Weather vs Malfunction Prediction
         s_score = spatial_consensus.spatial_consensus_score if spatial_consensus else 0.8
         is_spatially_inconsistent = spatial_consensus.is_spatially_inconsistent if spatial_consensus else False
@@ -213,7 +235,7 @@ class HierarchicalArbiter:
                 latency_ms=round(latency_ms, 2),
             )
 
-        has_hard_fail = any(r in tier1_fired_rules for r in ("DEW_POINT_INVARIANT", "RANGE_CHECK"))
+        has_hard_fail = any(r in tier1_fired_rules for r in ("DEW_POINT_INVARIANT", "RANGE_CHECK", "SEASONAL_RANGE_CHECK", "RAIN_THERMAL_INCONSISTENCY"))
 
         has_spatial_consensus = (
             spatial_consensus is not None

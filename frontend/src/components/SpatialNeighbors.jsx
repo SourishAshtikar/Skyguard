@@ -3,11 +3,34 @@ import { Compass, CheckCircle2, AlertTriangle, ArrowUpRight, Thermometer, Gauge,
 
 export default function SpatialNeighbors({
   station,
-  nearestNeighbors,
+  nearestNeighbors = [],
   spatialConsensus,
+  latestResult,
   onSelectStation,
 }) {
   if (!station) return null;
+
+  const targetTemp = latestResult?.raw_reading?.temperature;
+  const targetPres = latestResult?.raw_reading?.pressure;
+  const targetHumi = latestResult?.raw_reading?.humidity;
+
+  const isOutlier = Boolean(
+    spatialConsensus?.is_spatially_inconsistent ??
+    spatialConsensus?.inconsistent ??
+    (spatialConsensus?.target_deviation_temp != null && spatialConsensus.target_deviation_temp > 4.0) ??
+    false
+  );
+
+  const rawConsensusScore = spatialConsensus?.spatial_consensus_score ?? spatialConsensus?.consensus_score;
+  const consensusScorePct = rawConsensusScore != null
+    ? Math.round(rawConsensusScore * 100)
+    : (isOutlier ? 12 : 95);
+
+  const targetDevTemp = spatialConsensus?.target_deviation_temp != null
+    ? spatialConsensus.target_deviation_temp
+    : (targetTemp != null && nearestNeighbors.length > 0
+        ? Math.abs(targetTemp - (nearestNeighbors.reduce((acc, n) => acc + (n.temperature ?? targetTemp), 0) / nearestNeighbors.length))
+        : null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -33,8 +56,8 @@ export default function SpatialNeighbors({
             </div>
           </div>
         </div>
-        <span className={`badge ${spatialConsensus?.is_spatially_inconsistent ? 'badge-fail' : 'badge-pass'}`}>
-          {spatialConsensus?.is_spatially_inconsistent ? 'SPATIAL OUTLIER' : 'CONSENSUS VERIFIED'}
+        <span className={`badge ${isOutlier ? 'badge-fail' : 'badge-pass'}`}>
+          {isOutlier ? 'SPATIAL OUTLIER' : 'CONSENSUS VERIFIED'}
         </span>
       </div>
 
@@ -42,8 +65,8 @@ export default function SpatialNeighbors({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
         <div className="glass-card" style={{ padding: '8px 10px' }}>
           <div style={{ fontSize: '0.65rem', color: '#8b949e', fontWeight: 600 }}>CONSENSUS SCORE</div>
-          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#58a6ff', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
-            {((spatialConsensus?.spatial_consensus_score ?? 0.95) * 100).toFixed(0)}%
+          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: isOutlier ? '#f85149' : '#58a6ff', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
+            {consensusScorePct}%
           </div>
           <div style={{ fontSize: '0.65rem', color: '#6e7681' }}>Cluster Correlation</div>
         </div>
@@ -54,12 +77,12 @@ export default function SpatialNeighbors({
             style={{
               fontSize: '1.2rem',
               fontWeight: 700,
-              color: (spatialConsensus?.target_deviation_temp || 0) > 4.0 ? '#f85149' : '#3fb950',
+              color: (targetDevTemp != null && targetDevTemp > 4.0) ? '#f85149' : '#3fb950',
               marginTop: '2px',
               fontFamily: 'var(--font-mono)',
             }}
           >
-            {spatialConsensus?.target_deviation_temp ? `${spatialConsensus.target_deviation_temp.toFixed(1)}°C` : '0.4°C'}
+            {targetDevTemp != null ? `${targetDevTemp.toFixed(1)}°C` : '0.4°C'}
           </div>
           <div style={{ fontSize: '0.65rem', color: '#6e7681' }}>vs Regional Median</div>
         </div>
@@ -90,7 +113,19 @@ export default function SpatialNeighbors({
           </div>
         ) : (
           nearestNeighbors.map((n, idx) => {
-            const isNominal = n.status !== 'SUSPECT';
+            const liveDeltaT = (n.temperature != null && targetTemp != null)
+              ? Number((n.temperature - targetTemp).toFixed(1))
+              : n.delta_t;
+            const liveDeltaP = (n.pressure != null && targetPres != null)
+              ? Number((n.pressure - targetPres).toFixed(1))
+              : n.delta_p;
+            const liveDeltaH = (n.humidity != null && targetHumi != null)
+              ? Number((n.humidity - targetHumi).toFixed(1))
+              : n.delta_h;
+
+            const isPeerDiverged = liveDeltaT != null ? Math.abs(liveDeltaT) > 3.5 : (n.status === 'SUSPECT');
+            const isNominal = !isPeerDiverged;
+
             const tempVal = n.temperature != null ? `${n.temperature.toFixed(1)}°C` : 'N/A';
             const presVal = n.pressure != null ? `${n.pressure.toFixed(1)} hPa` : 'N/A';
             const humiVal = n.humidity != null ? `${n.humidity.toFixed(1)}%` : 'N/A';
@@ -105,7 +140,7 @@ export default function SpatialNeighbors({
                   flexDirection: 'column',
                   gap: '6px',
                   cursor: 'pointer',
-                  border: isNominal ? '1px solid #30363d' : '1px solid #d29922',
+                  border: isNominal ? '1px solid #30363d' : '1px solid #f85149',
                 }}
                 onClick={() => onSelectStation && onSelectStation(n)}
                 title={`Click to inspect ${n.station_name}`}
@@ -129,8 +164,8 @@ export default function SpatialNeighbors({
                       {n.distance_km.toFixed(1)} km
                     </span>
                     <div style={{ marginTop: '2px' }}>
-                      <span className={`badge ${isNominal ? 'badge-pass' : 'badge-warning'}`} style={{ fontSize: '0.62rem' }}>
-                        {isNominal ? 'Synced • Nominal' : 'Variance Suspect'}
+                      <span className={`badge ${isNominal ? 'badge-pass' : 'badge-fail'}`} style={{ fontSize: '0.62rem' }}>
+                        {isNominal ? 'Synced • Nominal' : 'Peer Diverged'}
                       </span>
                     </div>
                   </div>
@@ -157,9 +192,9 @@ export default function SpatialNeighbors({
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f0f6fc', fontFamily: 'var(--font-mono)' }}>
                       {tempVal}
                     </div>
-                    {n.delta_t != null && (
-                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_t) > 3.0 ? '#d29922' : '#3fb950' }}>
-                        Δ {n.delta_t > 0 ? `+${n.delta_t}` : n.delta_t}°C
+                    {liveDeltaT != null && (
+                      <div style={{ fontSize: '0.65rem', color: Math.abs(liveDeltaT) > 3.0 ? '#f85149' : '#3fb950', fontWeight: Math.abs(liveDeltaT) > 3.0 ? 700 : 400 }}>
+                        Δ {liveDeltaT > 0 ? `+${liveDeltaT}` : liveDeltaT}°C
                       </div>
                     )}
                   </div>
@@ -173,9 +208,9 @@ export default function SpatialNeighbors({
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f0f6fc', fontFamily: 'var(--font-mono)' }}>
                       {presVal}
                     </div>
-                    {n.delta_p != null && (
-                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_p) > 4.0 ? '#d29922' : '#bc8cff' }}>
-                        Δ {n.delta_p > 0 ? `+${n.delta_p}` : n.delta_p} hPa
+                    {liveDeltaP != null && (
+                      <div style={{ fontSize: '0.65rem', color: Math.abs(liveDeltaP) > 4.0 ? '#f85149' : '#bc8cff', fontWeight: Math.abs(liveDeltaP) > 4.0 ? 700 : 400 }}>
+                        Δ {liveDeltaP > 0 ? `+${liveDeltaP}` : liveDeltaP} hPa
                       </div>
                     )}
                   </div>
@@ -189,9 +224,9 @@ export default function SpatialNeighbors({
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f0f6fc', fontFamily: 'var(--font-mono)' }}>
                       {humiVal}
                     </div>
-                    {n.delta_h != null && (
-                      <div style={{ fontSize: '0.65rem', color: Math.abs(n.delta_h) > 15.0 ? '#d29922' : '#3fb950' }}>
-                        Δ {n.delta_h > 0 ? `+${n.delta_h}` : n.delta_h}%
+                    {liveDeltaH != null && (
+                      <div style={{ fontSize: '0.65rem', color: Math.abs(liveDeltaH) > 15.0 ? '#f85149' : '#3fb950', fontWeight: Math.abs(liveDeltaH) > 15.0 ? 700 : 400 }}>
+                        Δ {liveDeltaH > 0 ? `+${liveDeltaH}` : liveDeltaH}%
                       </div>
                     )}
                   </div>

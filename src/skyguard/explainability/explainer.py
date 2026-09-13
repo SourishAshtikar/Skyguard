@@ -79,6 +79,21 @@ class IncidentExplainer:
                             "vapor than its saturation vapor pressure at that temperature. Dew point exceeding ambient air temperature "
                             "is physically impossible in Earth's atmosphere and indicates a wet-bulb / capacitive RH sensor calibration breakdown."
                         )
+                    elif "SEASONAL_RANGE" in res.rule_name:
+                        lines.append(
+                            "      Reasoning: The recorded temperature violates regional climatological boundaries codified by the "
+                            "India Meteorological Department (IMD) for this specific season. In maritime/peninsular regions during the "
+                            "Southwest Monsoon (June–Sept), continuous cloud albedo, maritime monsoonal air mass, and frequent precipitation "
+                            "strictly cap temperatures below 36.5°C. A reading of 44°C is possible during peak summer heatwaves in northern deserts, "
+                            "but physically impossible in coastal peninsular India during the rainy monsoon season."
+                        )
+                    elif "RAIN_THERMAL" in res.rule_name:
+                        lines.append(
+                            "      Reasoning: Under active precipitation or saturated relative humidity (RH ≥ 80%), falling rain droplets "
+                            "undergo sub-cloud evaporative cooling, cooling the ambient air toward the wet-bulb temperature. "
+                            "Tropospheric thermodynamics cap rain-cooled air below 33.5°C in India. Furthermore, water vapor partial pressure "
+                            "cannot exceed Earth's physical tropospheric limit (42.0 hPa). High temperature during rain represents an unphysical sensor fault."
+                        )
                     elif "RANGE" in res.rule_name:
                         lines.append(
                             "      Reasoning: Value exceeds extreme Indian climatological boundaries codified in WMO Guide No. 8 and "

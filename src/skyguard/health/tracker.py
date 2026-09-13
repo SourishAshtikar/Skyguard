@@ -72,13 +72,22 @@ class SensorHealthTracker:
         health_score = float(np.clip(100.0 - penalty, 0.0, 100.0))
 
         # Status and Action determination
-        if self.consecutive_failures >= self.consecutive_fail_limit or health_score < 40.0:
-            status = "CRITICAL"
-            action = "Urgent: Sensor failure suspected. Immediate on-site technician inspection required."
-            days_to_maintenance = 1
+        if is_anomaly:
+            if self.consecutive_failures >= self.consecutive_fail_limit or health_score < 50.0:
+                status = "CRITICAL"
+                action = "Urgent: Sensor failure verified. Immediate on-site technician inspection and transducer replacement required."
+                days_to_maintenance = 1
+            else:
+                status = "FAULT_DETECTED"
+                action = "Active Malfunction Detected: Automated Kalman self-healing imputation deployed. Inspect transducer and cabling."
+                days_to_maintenance = 3
+        elif is_missing:
+            status = "DROPOUT"
+            action = "Transmission Dropout: Check solar panel voltage, battery state-of-charge (<11.2V), and SIM/transmitter."
+            days_to_maintenance = 3
         elif anom_rate >= self.warning_anomaly_rate or health_score < 75.0:
             status = "DEGRADED"
-            action = "Warning: Intermittent anomalies detected. Schedule recalibration within 7 days."
+            action = "Warning: Intermittent anomalies detected in rolling buffer. Schedule recalibration within 7 days."
             days_to_maintenance = 7
         else:
             status = "HEALTHY"
