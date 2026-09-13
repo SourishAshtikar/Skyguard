@@ -29,7 +29,7 @@ import AnomalySandbox from './components/AnomalySandbox';
 import CustomAnomalyModal from './components/CustomAnomalyModal';
 import StationDirectoryModal from './components/StationDirectoryModal';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
 export default function App() {
   const [stations, setStations] = useState([]);
