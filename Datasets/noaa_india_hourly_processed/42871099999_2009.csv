@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2009-02-05T03:00:00,42871099999,GONDIA ARPT/BIRSI,21.467,80.2,22.2,,47.78
+2009-02-05T12:00:00,42871099999,GONDIA ARPT/BIRSI,21.467,80.2,30.4,,38.51

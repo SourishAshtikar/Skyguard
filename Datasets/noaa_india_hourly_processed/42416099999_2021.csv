@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2021-04-17T00:00:00,42416099999,TEZPUR/BINDUKURI,26.717,92.8,21.0,1015.8,94.6
+2021-07-02T12:00:00,42416099999,TEZPUR/BINDUKURI,26.717,92.8,26.6,1001.8,94.82

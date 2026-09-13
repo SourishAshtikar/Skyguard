@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2000-02-13T09:00:00,42731099999,DWARKA,22.37,69.08,17.4,1016.9,54.02

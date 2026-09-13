@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2002-06-21T18:00:00,42679099999,UMARIA,23.533,80.883,25.6,999.4,87.14
+2002-07-16T12:00:00,42679099999,UMARIA,23.533,80.883,32.6,,49.6

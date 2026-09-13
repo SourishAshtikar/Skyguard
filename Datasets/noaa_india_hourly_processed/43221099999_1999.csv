@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1999-01-01T03:00:00,43221099999,ONGOLE,15.5,80.08,19.8,1017.1,82.85

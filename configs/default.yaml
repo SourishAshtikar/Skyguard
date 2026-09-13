@@ -1,0 +1,64 @@
+# SkyGuard AI — Default System Configuration
+
+system:
+  name: "SkyGuard AI"
+  version: "1.0.0"
+  target_hardware: "ESP32 / Cloud Gateway"
+
+tier1_rules:
+  range_check:
+    temp_min: -40.0   # °C
+    temp_max: 55.0    # °C (Highest recorded in India: 51.0°C Phalodi)
+    pres_min: 500.0   # hPa (High altitude stations e.g. Leh)
+    pres_max: 1080.0  # hPa
+    humi_min: 0.0     # %
+    humi_max: 100.0   # %
+  step_check:
+    temp_max_1step_delta: 6.0   # °C per hour
+    pres_max_1step_delta: 5.0   # hPa per hour
+    humi_max_1step_delta: 30.0  # % per hour
+    sigma_multiplier: 4.0       # 4-sigma rule
+  persistence:
+    max_identical_steps: 6      # >= 6 identical readings triggers stuck sensor flag
+    stuck_delta_threshold: 0.05
+  dew_point_check:
+    max_tolerance: 0.1          # T_dew can at most exceed T by 0.1°C due to numeric noise
+
+tier2_autoencoder:
+  architecture: [10, 8, 4, 8, 10]
+  input_dim: 10
+  bottleneck_dim: 4
+  reconstruction_threshold: 0.045
+  int8_quantized: true
+
+tier3_cloud:
+  stage1_forecaster:
+    model_type: "kalman_state_space"
+    state_dim: 3
+    innovation_chi2_threshold_p99: 11.345  # Chi-squared 3-dof at p=0.99
+    confidence_sigma: 3.0
+  stage2_isoforest:
+    n_estimators: 100
+    contamination: 0.02
+    threshold: 0.65
+  stage3_arbiter:
+    max_depth: 4
+    n_estimators: 80
+    learning_rate: 0.08
+    min_child_weight: 2
+
+spatial_validation:
+  search_radius_km: 150.0
+  min_neighbors: 2
+  max_neighbors: 5
+  divergence_z_threshold: 3.0
+
+sensor_health:
+  rolling_window_readings: 48
+  critical_anomaly_rate: 0.35
+  warning_anomaly_rate: 0.15
+  consecutive_fail_limit: 5
+
+correction:
+  min_confidence_to_apply: 0.85
+  fallback_method: "KALMAN_FORECAST"

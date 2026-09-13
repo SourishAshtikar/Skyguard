@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2020-03-06T12:00:00,42063099999,KYELONG,32.583,77.067,27.2,1007.2,38.62

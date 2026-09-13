@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1990-03-19T15:00:00,42500099999,PURNEA,25.267,87.467,26.8,1013.7,80.2

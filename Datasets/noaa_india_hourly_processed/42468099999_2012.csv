@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2012-02-18T15:00:00,42468099999,ORAI,25.983,79.5,36.6,1005.4,43.27

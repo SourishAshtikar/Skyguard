@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2001-11-09T06:00:00,42295099999,DARJEELING,99.999,999.999,27.4,1012.4,74.2

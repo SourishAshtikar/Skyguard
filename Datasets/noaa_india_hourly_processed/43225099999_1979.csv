@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1979-04-03T09:00:00,43225099999,KARWAR,14.783,74.133,-4.0,997.2,85.97
+1979-07-10T12:00:00,43225099999,KARWAR,14.783,74.133,29.0,1007.1,79.06

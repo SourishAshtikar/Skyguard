@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2017-10-08T12:00:00,42274099999,GONDA,27.133,81.967,33.2,1005.0,63.35

@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1979-05-13T03:00:00,43136099999,BHADRACHALAM,17.667,80.883,30.0,1003.9,70.29
+1979-07-09T03:00:00,43136099999,BHADRACHALAM,17.667,80.883,28.0,1002.8,78.92

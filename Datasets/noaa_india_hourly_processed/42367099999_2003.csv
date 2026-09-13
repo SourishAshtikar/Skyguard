@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2003-01-12T18:00:00,42367099999,KANPUR CHAKERI,26.4,80.4,7.6,1022.2,
+2003-06-01T12:00:00,42367099999,KANPUR CHAKERI,26.4,80.4,43.0,997.4,12.39

@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2023-01-26T03:00:00,43013099999,AURANGABAD,19.883,75.333,20.6,1017.6,78.85
+2023-04-22T12:00:00,43013099999,AURANGABAD,19.883,75.333,35.0,999.7,41.54

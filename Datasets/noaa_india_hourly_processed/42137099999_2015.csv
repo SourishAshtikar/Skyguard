@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2015-12-23T03:00:00,42137099999,KARNAL,29.7,77.033,5.0,1022.0,100.0

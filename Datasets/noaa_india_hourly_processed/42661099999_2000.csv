@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2000-03-28T09:00:00,42661099999,RATLAM,23.32,75.05,5.0,1080.2,52.19

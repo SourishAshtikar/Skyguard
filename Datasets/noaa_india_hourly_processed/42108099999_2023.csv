@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2023-07-12T03:00:00,42108099999,UTTARKASHI,30.733,78.45,28.4,1000.2,93.78
+2023-08-05T03:00:00,42108099999,UTTARKASHI,30.733,78.45,26.4,1002.4,94.81

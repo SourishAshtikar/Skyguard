@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2001-07-28T15:00:00,42771099999,SEONI,22.07,79.55,25.0,1008.4,78.5

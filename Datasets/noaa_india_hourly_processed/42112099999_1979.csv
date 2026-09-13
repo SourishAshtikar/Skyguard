@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1979-01-29T12:00:00,42112099999,MUSSOORIE,30.45,78.083,4.0,,75.17
+1979-05-03T00:00:00,42112099999,MUSSOORIE,30.45,78.083,23.0,,28.99

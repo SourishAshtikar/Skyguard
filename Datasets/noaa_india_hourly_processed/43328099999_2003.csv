@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2003-05-09T12:00:00,43328099999,PONDICHERRY,11.917,79.833,32.8,1003.7,53.11
+2003-05-28T18:00:00,43328099999,PONDICHERRY,11.917,79.833,27.0,1008.0,84.18

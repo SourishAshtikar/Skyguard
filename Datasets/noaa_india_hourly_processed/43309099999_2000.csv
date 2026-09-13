@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2000-10-10T12:00:00,43309099999,MAYA BANDAR,12.91,92.92,25.0,1005.4,100.0

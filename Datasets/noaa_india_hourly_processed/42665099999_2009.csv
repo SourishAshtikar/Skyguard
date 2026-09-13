@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2009-02-05T03:00:00,42665099999,SHAJAPUR,23.433,76.317,31.0,1014.7,22.0
+2009-02-05T12:00:00,42665099999,SHAJAPUR,23.433,76.317,29.0,1009.8,24.18

@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2024-08-23T00:00:00,42934099999,AKOLA,20.7,77.067,25.8,1006.0,93.11
+2024-11-09T00:00:00,42934099999,AKOLA,20.699,77.059,22.0,,78.06

@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2001-10-14T12:00:00,42730099999,OKHA,99.999,999.999,39.0,1000.5,22.83

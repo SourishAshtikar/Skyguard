@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2001-10-01T00:00:00,42841099999,BROACH,99.999,999.999,,1003.2,

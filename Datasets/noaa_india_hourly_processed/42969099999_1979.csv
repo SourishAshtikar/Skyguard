@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1979-06-22T03:00:00,42969099999,ANGUL,20.833,85.1,31.0,999.2,66.38
+1979-07-06T03:00:00,42969099999,ANGUL,20.833,85.1,36.0,995.0,

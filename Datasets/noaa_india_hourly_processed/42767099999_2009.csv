@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2009-02-05T03:00:00,42767099999,PACHMARHI,22.467,78.433,14.0,,68.53
+2009-02-05T12:00:00,42767099999,PACHMARHI,22.467,78.433,24.8,,29.49

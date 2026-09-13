@@ -1,0 +1,4 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2009-01-01T21:00:00,42083099999,SHIMLA,31.1,77.167,-6.7,,78.59
+2009-02-05T03:00:00,42083099999,SHIMLA,31.1,77.167,8.4,,52.74
+2009-02-05T09:00:00,42083099999,SHIMLA,31.1,77.167,14.4,,38.97

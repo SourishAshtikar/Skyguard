@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2018-03-24T18:00:00,42063099999,KYELONG,32.583,77.067,23.2,1012.2,56.59

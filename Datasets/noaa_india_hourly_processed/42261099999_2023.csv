@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2023-12-05T03:00:00,42261099999,AGRA,27.167,78.033,18.2,1013.5,90.97

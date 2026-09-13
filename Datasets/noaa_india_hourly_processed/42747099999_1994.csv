@@ -1,0 +1,4 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1994-01-01T18:00:00,42747099999,BARODA,22.3,73.25,,1016.3,
+1994-03-25T18:00:00,42747099999,BARODA,22.3,73.25,9.8,1016.0,
+1994-04-02T06:00:00,42747099999,BARODA,22.3,73.25,29.2,1010.4,47.2

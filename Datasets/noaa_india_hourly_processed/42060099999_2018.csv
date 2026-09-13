@@ -1,0 +1,4 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2018-03-01T12:00:00,42060099999,KATHUA,32.333,75.5,28.0,,54.58
+2018-03-10T12:00:00,42060099999,KATHUA,32.333,75.5,27.0,,63.96
+2018-03-16T03:00:00,42060099999,KATHUA,32.333,75.5,22.0,,59.69

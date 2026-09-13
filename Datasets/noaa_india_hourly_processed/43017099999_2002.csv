@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2002-04-07T18:00:00,43017099999,PARBHANI,99.999,999.999,30.4,1009.1,47.81
+2002-06-05T12:00:00,43017099999,PARBHANI,99.999,999.999,33.4,1000.0,41.62

@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2016-08-07T13:30:00,42423199999,JORHAT,26.732,94.176,29.0,,83.9
+2016-08-11T05:30:00,42423199999,JORHAT,26.732,94.176,33.0,,70.84

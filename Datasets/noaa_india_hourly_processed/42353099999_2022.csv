@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2022-03-26T12:00:00,42353099999,SUPAUL,26.133,86.583,22.4,1016.6,67.55

@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2009-02-05T03:00:00,42937099999,AMRAOTI,20.933,77.783,20.8,1015.5,50.35
+2009-02-05T12:00:00,42937099999,AMRAOTI,20.933,77.783,32.8,1010.0,62.14

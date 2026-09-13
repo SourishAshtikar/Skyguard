@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2018-01-08T12:00:00,42439099999,JALORE,25.35,72.617,24.0,1014.4,32.92
+2018-01-09T03:00:00,42439099999,JALORE,25.35,72.617,12.0,1020.1,53.72

@@ -1,0 +1,4 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1990-01-16T12:00:00,42083099999,SHIMLA,31.1,77.167,10.8,,35.18
+1990-01-17T12:00:00,42083099999,SHIMLA,31.1,77.167,11.6,,53.99
+1990-03-05T12:00:00,42083099999,SHIMLA,31.1,77.167,3.2,,

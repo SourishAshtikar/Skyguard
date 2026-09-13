@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2001-08-27T12:00:00,42599099999,DUMKA,24.75,84.94,30.6,,56.6
+2001-11-19T12:00:00,42599099999,DUMKA,99.999,999.999,17.0,1017.2,58.88

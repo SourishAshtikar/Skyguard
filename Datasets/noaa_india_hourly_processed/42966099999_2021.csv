@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2021-02-18T12:00:00,42966099999,PHULBANI,20.483,84.267,28.4,,47.89
+2021-07-12T12:00:00,42966099999,PHULBANI,20.483,84.267,29.2,,83.92

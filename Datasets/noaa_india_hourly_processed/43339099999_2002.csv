@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2002-11-15T06:00:00,43339099999,KODAIKANAL,10.233,77.467,30.4,1009.6,78.32
+2002-11-24T00:00:00,43339099999,KODAIKANAL,10.233,77.467,25.4,1008.3,94.77

@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2013-04-16T06:00:00,43278099999,NUMGAMBAKKAM,13.067,80.2,37.0,1007.1,39.09
+2013-06-04T00:00:00,43278099999,NUMGAMBAKKAM,13.067,80.2,29.0,1002.7,61.68

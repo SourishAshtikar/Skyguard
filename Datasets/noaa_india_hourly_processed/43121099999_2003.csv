@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2003-02-18T12:00:00,43121099999,GULBARGA,17.35,76.85,32.0,1008.3,37.25
+2003-07-27T12:00:00,43121099999,GULBARGA,17.35,76.85,29.4,999.2,59.53

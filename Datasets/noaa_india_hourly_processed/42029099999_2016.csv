@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2016-01-13T03:00:00,42029099999,SONAMARG,34.317,75.317,-3.0,963.0,82.25

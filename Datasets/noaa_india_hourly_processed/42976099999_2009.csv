@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2009-02-05T03:00:00,42976099999,PARADIP (C.W.R.),20.3,86.683,25.4,1016.3,83.5
+2009-02-05T09:00:00,42976099999,PARADIP (C.W.R.),20.3,86.683,28.6,1012.9,70.46

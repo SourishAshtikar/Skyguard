@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2002-06-05T12:00:00,43327099999,KARAIKUDI,99.999,999.999,,1003.7,
+2002-10-08T12:00:00,43327099999,KARAIKUDI,99.999,999.999,28.8,1005.8,56.52

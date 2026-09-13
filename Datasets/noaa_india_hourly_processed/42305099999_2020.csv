@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2020-08-23T12:00:00,42305099999,BOMDILA,27.417,92.85,29.6,1000.8,82.0
+2020-12-27T03:00:00,42305099999,BOMDILA,27.417,92.85,18.8,1016.7,56.24

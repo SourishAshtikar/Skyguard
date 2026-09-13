@@ -1,0 +1,51 @@
+# SkyGuard AI — Synthetic Anomaly Injection Configuration
+# Defines parameters for all 10 canonical anomaly scenarios.
+
+scenarios:
+  spike:
+    temp_jump_range: [10.0, 25.0]     # °C
+    pres_jump_range: [8.0, 20.0]      # hPa
+    humi_jump_range: [25.0, 50.0]     # %
+    duration_steps: 1
+    revert: true
+
+  frozen_sensor:
+    duration_steps_min: 8
+    duration_steps_max: 24
+    noise_amplitude: 0.0
+
+  calibration_drift:
+    drift_rate_per_step_temp: 0.15     # °C per step
+    drift_rate_per_step_pres: 0.3      # hPa per step
+    drift_rate_per_step_humi: 0.5      # % per step
+    duration_steps: 48
+
+  communication_dropout:
+    duration_steps_min: 3
+    duration_steps_max: 12
+    fill_value: null                   # NaN / None
+
+  packet_corruption:
+    bit_flip_rate: 0.05
+    impossible_multiplier: 10.0        # e.g., 28.5°C -> 285.0°C
+
+  physical_inconsistency:
+    type: "dew_point_exceedance"
+    inversion_delta: 5.0               # Humidity set to drive T_dew > T + 5°C
+
+  noise_jitter:
+    variance_multiplier: 6.0
+    duration_steps: 20
+
+  range_violation:
+    extreme_temp: 62.0                 # > 55°C (Physically impossible in India)
+    extreme_pres: 1120.0               # > 1080 hPa
+    extreme_humi: 125.0                # > 100%
+
+  spatial_inconsistency:
+    target_offset_temp: 14.0           # Station reads 14°C higher than surrounding neighbors
+    duration_steps: 12
+
+  temporal_pattern_break:
+    duration_steps: 24                 # Diurnal cycle flattened during daytime
+    flat_value_offset: 0.0

@@ -1,0 +1,4 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1947-10-16T03:00:00,43541099999,SONAMARG          &,34.317,75.317,0.6,1006.6,75.13
+1947-11-03T03:00:00,43541099999,SONAMARG          &,34.317,75.317,-2.2,1012.4,92.16
+1947-12-07T03:00:00,43541099999,SONAMARG          &,34.317,75.317,26.1,,93.68

@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2020-10-25T12:00:00,42029099999,SONAMARG,34.317,75.317,31.4,1007.8,59.99

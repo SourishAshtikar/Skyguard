@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2014-03-06T03:00:00,42460099999,DATIA,25.667,78.467,,1014.1,
+2014-11-13T21:00:00,42460099999,DATIA,25.667,78.467,,1014.5,

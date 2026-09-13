@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2022-12-20T21:00:00,42599099999,DUMKA,24.267,87.25,13.0,1013.4,72.64

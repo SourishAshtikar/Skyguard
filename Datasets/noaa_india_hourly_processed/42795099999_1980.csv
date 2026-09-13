@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1980-01-04T00:00:00,42795099999,CHAIBASA,22.55,85.817,19.0,1015.4,88.19
+1980-01-07T15:00:00,42795099999,CHAIBASA,22.55,85.817,16.0,1018.2,87.93

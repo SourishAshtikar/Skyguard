@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2001-03-14T00:00:00,42577099999,SIDHI,24.417,81.867,16.0,1009.3,68.93
+2001-05-29T18:00:00,42577099999,SIDHI,24.417,81.867,33.2,998.7,35.94

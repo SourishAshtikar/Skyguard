@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2007-05-20T12:00:00,42170099999,CHURU,28.25,74.917,36.6,1000.1,28.83
+2007-05-21T00:00:00,42170099999,CHURU,28.25,74.917,28.6,1000.7,47.64

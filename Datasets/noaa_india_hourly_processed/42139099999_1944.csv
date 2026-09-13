@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1944-11-29T03:00:00,42139099999,MEERUT,29.017,77.717,-7.2,,
+1944-12-25T03:00:00,42139099999,MEERUT,29.017,77.717,,1002.0,

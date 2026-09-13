@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2001-11-01T00:00:00,42539099999,DEESA,99.999,999.999,18.8,1011.2,60.92

@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2009-02-05T03:00:00,42770099999,NARSINGHPUR,22.95,79.183,15.8,1018.2,80.76
+2009-02-05T12:00:00,42770099999,NARSINGHPUR,22.95,79.183,27.8,1016.0,39.56

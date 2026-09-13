@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2009-02-05T03:00:00,42044099999,QAZI GUND,33.583,75.083,5.4,,81.0
+2009-02-05T09:00:00,42044099999,QAZI GUND,33.583,75.083,5.0,,85.68

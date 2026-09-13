@@ -1,0 +1,4 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1962-04-03T03:00:00,43542099999,DRAS,34.433,75.767,22.2,1013.3,
+1962-04-08T03:00:00,43542099999,DRAS,34.433,75.767,,996.3,
+1962-07-02T03:00:00,43542099999,DRAS,34.433,75.767,21.1,1002.9,

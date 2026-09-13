@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2017-01-23T12:00:00,42751099999,DOHAD,22.833,74.267,25.4,1016.1,41.29

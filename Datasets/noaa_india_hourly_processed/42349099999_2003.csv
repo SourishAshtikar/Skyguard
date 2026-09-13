@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2003-01-26T12:00:00,42349099999,TONK,26.17,75.75,22.4,1013.9,51.11

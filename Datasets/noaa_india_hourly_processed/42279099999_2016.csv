@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2016-08-04T15:00:00,42279099999,BASTI,26.8,82.733,24.0,998.1,94.72
+2016-09-05T09:00:00,42279099999,BASTI,26.8,82.733,28.0,1003.8,73.85

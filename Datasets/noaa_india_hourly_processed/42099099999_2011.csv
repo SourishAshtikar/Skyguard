@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2011-10-03T09:30:00,42099099999,LUDHIANA,30.867,75.933,33.0,,46.44
+2011-10-03T10:30:00,42099099999,LUDHIANA,30.867,75.933,32.0,,49.14

@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1979-02-04T06:00:00,43125099999,BIDAR,17.917,77.533,30.0,1015.4,70.29
+1979-07-06T03:00:00,43125099999,BIDAR,17.917,77.533,25.0,1006.2,78.5

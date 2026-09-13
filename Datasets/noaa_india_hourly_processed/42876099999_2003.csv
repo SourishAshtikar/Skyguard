@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2003-02-16T06:00:00,42876099999,DURG,99.999,999.999,27.0,1016.0,54.68

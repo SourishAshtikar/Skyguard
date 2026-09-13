@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2008-02-02T21:00:00,42731099999,DWARKA,22.367,69.083,20.0,1011.4,57.29
+2008-02-03T00:00:00,42731099999,DWARKA,22.367,69.083,16.0,1011.9,73.18

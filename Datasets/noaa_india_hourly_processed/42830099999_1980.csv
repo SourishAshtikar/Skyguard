@@ -1,0 +1,2 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1980-01-22T03:00:00,42830099999,PORBANDAR,21.65,69.667,17.0,1019.0,77.31

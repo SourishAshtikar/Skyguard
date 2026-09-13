@@ -1,0 +1,4 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+1989-03-06T12:00:00,42270099999,KHERI,27.9,80.8,29.6,1009.1,24.5
+1989-11-15T12:00:00,42270099999,KHERI,27.9,80.8,25.0,,40.63
+1989-11-28T06:00:00,42270099999,KHERI,27.9,80.8,27.6,1016.6,45.29

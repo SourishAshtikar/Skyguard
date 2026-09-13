@@ -1,0 +1,3 @@
+timestamp,station_id,station_name,latitude,longitude,temperature,pressure,humidity
+2020-07-08T06:00:00,42151099999,DHARCHULA,29.85,80.533,20.8,,100.0
+2020-09-15T12:00:00,42151099999,DHARCHULA,29.85,80.533,20.2,,96.35
