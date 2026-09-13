@@ -43,63 +43,71 @@ Automatic Weather Stations (AWS) across India's diverse agro-climatic zones (Him
 
 ## 🏛️ System Architecture
 
-```
-                                 [ Raw AWS Telemetry Stream (1 Hz - 1/3600 Hz) ]
-                                    (Temperature, Pressure, Humidity, Battery)
-                                                        │
-                                                        ▼
-                                ┌───────────────────────────────────────────────┐
-                                │   Streaming Feature Extractor (48-step FIFO)  │
-                                │  29 Canonical Thermodynamic & Dynamic Features│
-                                └───────────────────────┬───────────────────────┘
-                                                        │
-                    ┌───────────────────────────────────┴───────────────────────────────────┐
-                    ▼                                                                       ▼
-   ┌─────────────────────────────────┐                                     ┌─────────────────────────────────┐
-   │    TIER 1: Edge Deterministic   │                                     │     TIER 2: Quantized Edge AE   │
-   │  - Range Limits (India bounds)  │                                     │  - 10 -> 8 -> 4 -> 8 -> 10 MCU  │
-   │  - 4σ Dynamic Step Jump Filter  │                                     │  - Non-linear Inter-Sensor MSE  │
-   │  - Multi-Timestep Persistence   │                                     │  - Sub-0.25 ms C++ Weight Matrix│
-   │  - Magnus-Tetens Dew Point Inv. │                                     └────────────────┬────────────────┘
-   └────────────────┬────────────────┘                                                      │
-                    │                                                                       │
-                    └───────────────────────────────────┬───────────────────────────────────┘
-                                                        │
-                                                        ▼
-                        ┌───────────────────────────────────────────────────────────────┐
-                        │              TIER 3 STAGE 1: State-Space Forecaster           │
-                        │       3D Kalman Filter (T, P, RH) + Diurnal Harmonic Regressors│
-                        │             Innovation Mahalanobis Distance D_M^2             │
-                        └───────────────────────────────┬───────────────────────────────┘
-                                                        │
-                                   Suspicious Filter Trigger (D_M^2 > 13.82)
-                                                        │
-                    ┌───────────────────────────────────┼───────────────────────────────────┐
-                    ▼                                   ▼                                   ▼
-   ┌─────────────────────────────────┐ ┌─────────────────────────────────┐ ┌─────────────────────────────────┐
-   │ TIER 3 STAGE 2: Isolation Forest│ │   SPATIAL MESONET CONSENSUS     │ │  SPACEBORNE SATELLITE VALIDATOR │
-   │ - 150 Decision Trees            │ │ - Haversine Top-K Neighbors     │ │ - ISRO INSAT-3D/3DR TIR-1/TIR-2 │
-   │ - Multi-Variable Anomaly Score  │ │ - Median Absolute Deviation(MAD)│ │ - NASA POWER / Open-Meteo LST   │
-   │ - Residual Feature Space        │ │ - Inverse Distance Weighting    │ │ - Solar Zenith Energy Balance   │
-   └────────────────┬────────────────┘ └────────────────┬────────────────┘ └────────────────┬────────────────┘
-                    │                                   │                                   │
-                    └───────────────────────────────────┼───────────────────────────────────┘
-                                                        │
-                                                        ▼
-                                ┌───────────────────────────────────────────────┐
-                                │   TIER 3 STAGE 3: Hierarchical XGBoost Arbiter│
-                                │   ├── Model 1: Weather Event vs Malfunction   │
-                                │   └── Model 2: 11-Class Failure Mode Diagnoser│
-                                └───────────────────────┬───────────────────────┘
-                                                        │
-                    ┌───────────────────────────────────┼───────────────────────────────────┐
-                    ▼                                   ▼                                   ▼
-   ┌─────────────────────────────────┐ ┌─────────────────────────────────┐ ┌─────────────────────────────────┐
-   │   NATIVE TreeSHAP EXPLAINER     │ │     SENSOR HEALTH TRACKER       │ │   AUDITABLE SAFE IMPUTATION     │
-   │ - Exact Sub-5ms Shapley Values  │ │ - Rolling Anomaly Rate (0-100%) │ │ - Strict Unmodified Raw Store   │
-   │ - Plain-English Meteorological  │ │ - Drift Accumulator (deg C/mo)  │ │ - Kalman / Spatial Spline Fill  │
-   │   Root Cause Analysis Narrative │ │ - Predictive Maintenance Days   │ │ - Standard WMO QC Flags (0 - 4) │
-   └─────────────────────────────────┘ └─────────────────────────────────┘ └─────────────────────────────────┘
+```mermaid
+graph TD
+    classDef input fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000;
+    classDef edge fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000;
+    classDef tier3 fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000;
+    classDef output fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000;
+
+    subgraph Data_Ingestion ["Data Ingestion"]
+        A[Raw AWS Telemetry Stream<br>1 Hz - 1/3600 Hz<br>T, P, RH, Battery]:::input
+        B[Streaming Feature Extractor<br>48-step FIFO, 29 Features]:::input
+        A --> B
+    end
+
+    subgraph Edge_Intelligence ["Edge Intelligence (Tier 1 & 2)"]
+        direction LR
+        subgraph Tier1 ["Tier 1: Edge Deterministic (MCU)"]
+            direction TB
+            C[Range Limits]:::edge
+            D[4σ Step Jump]:::edge
+            E[Persistence]:::edge
+            F[Dew Point Inv.]:::edge
+            C --> D --> E --> F
+        end
+        subgraph Tier2 ["Tier 2: Quantized Edge AE (MCU)"]
+            direction TB
+            G[10->8->4->8->10 Bottleneck]:::edge
+            H[Inter-Sensor MSE]:::edge
+            I[Sub-0.25 ms C++ Inference]:::edge
+            G --> H --> I
+        end
+    end
+
+    B --> Tier1
+    B --> Tier2
+
+    subgraph Cloud_Intelligence ["Cloud Intelligence (Tier 3)"]
+        J[Tier 3 Stage 1: State-Space Forecaster<br>Kalman Filter + Harmonics]:::tier3
+        L{Innovation Mahalanobis<br>D_M² > 13.82}:::tier3
+        
+        Tier1 --> J
+        Tier2 --> J
+        J --> L
+        
+        M[Tier 3 Stage 2: Isolation Forest]:::tier3
+        N[Spatial Mesonet Consensus]:::tier3
+        O[Spaceborne Satellite Validator]:::tier3
+        
+        L -- Yes --> M
+        L -- Yes --> N
+        L -- Yes --> O
+        
+        P[Tier 3 Stage 3: Hierarchical XGBoost Arbiter<br>1. Weather vs Malfunction<br>2. 11-Class Diagnoser]:::tier3
+        
+        M --> P
+        N --> P
+        O --> P
+    end
+
+    subgraph Actions ["Actionable Outputs"]
+        R[Native TreeSHAP Explainer<br>Root Cause]:::output
+        S[Sensor Health Tracker<br>Predictive Maintenance]:::output
+        T[Auditable Safe Imputation<br>WMO QC Flags 0-4]:::output
+    end
+    
+    P --> Actions
 ```
 
 ---
@@ -160,29 +168,33 @@ Automatic Weather Stations (AWS) across India's diverse agro-climatic zones (Him
 
 SkyGuard AI integrates spaceborne thermal infrared and optical satellite observations to validate ground-level station readings without depending on human inspection.
 
-```
-                    ┌───────────────────────────────────────────────────────────┐
-                    │               Spaceborne Observation Feeds                │
-                    │  ├── ISRO MOSDAC INSAT-3D/3DR (TIR-1 10.8μm, TIR-2 12.0μm) │
-                    │  ├── Open-Meteo ERA5 / ECMWF / MSG Satellite Feed (Live)  │
-                    │  ├── NASA POWER Hourly GEOS-5 Satellite Assimilation      │
-                    │  └── Offline Solar-Zenith Energy Balance Fallback Model   │
-                    └─────────────────────────────┬─────────────────────────────┘
-                                                  │
-                                                  ▼
-                        ┌───────────────────────────────────────────────────┐
-                        │      Thermodynamic Satellite Invariant Checks     │
-                        └─────────────────┬─────────────────────────────────┘
-                                          │
-        ┌─────────────────────────────────┼─────────────────────────────────┐
-        ▼                                 ▼                                 ▼
-┌───────────────────────────────┐ ┌───────────────────────────────┐ ┌───────────────────────────────┐
-│   Thermal Divergence Check    │ │ Convective Storm Corroboration│ │  Cloud-Moisture Invariant     │
-│ |T_air - LST_adj| > 10.0°C    │ │ Cloud Top Temp < -35.0°C      │ │ Saturated RH > 95% under      │
-│ under clear skies (CF < 50%)  │ │ Cloud Fraction > 70%          │ │ 0% cloud cover (CF < 5%)      │
-│ flags sensor bias or shield   │ │ confirms genuine severe storm │ │ catches stuck hygrometer      │
-│ solar radiative overheating.  │ │ and prevents false alarms.    │ │ false saturation in daylight. │
-└───────────────────────────────┘ └───────────────────────────────┘ └───────────────────────────────┘
+```mermaid
+graph TD
+    classDef external fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000;
+    classDef process fill:#fff8e1,stroke:#f57f17,stroke-width:2px,color:#000;
+    classDef check fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000;
+
+    subgraph Feeds ["Spaceborne Observation Feeds"]
+        A1[ISRO MOSDAC INSAT-3D/3DR<br>TIR-1 10.8μm, TIR-2 12.0μm]:::external
+        A2[Open-Meteo ERA5 / ECMWF<br>MSG Satellite Feed]:::external
+        A3[NASA POWER Hourly GEOS-5]:::external
+        A4[Offline Solar-Zenith<br>Energy Balance Model]:::external
+    end
+    
+    B1{Thermodynamic Satellite Invariant Checks}:::process
+    
+    A1 --> B1
+    A2 --> B1
+    A3 --> B1
+    A4 --> B1
+    
+    C1["Thermal Divergence Check<br>|T_air - LST_adj| > 10.0°C<br>(Under clear skies CF < 50%)<br><i>Flags sensor bias/overheating</i>"]:::check
+    C2["Convective Storm Corroboration<br>Cloud Top Temp < -35.0°C<br>(Cloud Fraction > 70%)<br><i>Confirms severe storm</i>"]:::check
+    C3["Cloud-Moisture Invariant<br>Saturated RH > 95%<br>(Under 0% cloud cover)<br><i>Catches stuck hygrometer</i>"]:::check
+    
+    B1 --> C1
+    B1 --> C2
+    B1 --> C3
 ```
 
 ### Deterministic Solar-Zenith Radiative Balance Model
@@ -408,6 +420,19 @@ npm install
 npm run dev
 ```
 * Open your browser and navigate to: `http://localhost:5173/`
+
+---
+
+## 📚 References
+
+The methodologies and algorithms implemented in SkyGuard AI are grounded in the following foundational research papers and standard guidelines:
+
+1. [1] P. S. Biju, et al., "Quality control of meteorological data," *India Meteorological Department*, 2012.
+2. [2] F. T. Liu, K. M. Ting, and Z. Zhou, "Isolation Forest," in *2008 Eighth IEEE International Conference on Data Mining*, Pisa, Italy, 2008, pp. 413-422, doi: 10.1109/ICDM.2008.17.
+3. [3] T. Chen and C. Guestrin, "XGBoost: A Scalable Tree Boosting System," in *Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining*, San Francisco, CA, USA, 2016, pp. 785-794, doi: 10.1145/2939672.2939785.
+4. [4] S. M. Lundberg and S.-I. Lee, "A Unified Approach to Interpreting Model Predictions," in *Advances in Neural Information Processing Systems*, vol. 30, 2017.
+5. [5] R. E. Kalman, "A New Approach to Linear Filtering and Prediction Problems," *Journal of Basic Engineering*, vol. 82, no. 1, pp. 35-45, Mar. 1960, doi: 10.1115/1.3662552.
+6. [6] O. Alday, "Magnus-Tetens formula for dew point calculation," *Meteorological Applications*, vol. 15, no. 3, pp. 391-400, 2008.
 
 ---
 
