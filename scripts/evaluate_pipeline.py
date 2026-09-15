@@ -112,10 +112,10 @@ def inject_comprehensive_benchmark_suite(
         if idx + 40 >= n:
             break
         df_injected, meta = func(df_injected, start_idx=idx)
-        s = getattr(meta, "start_idx", idx)
-        dur = getattr(meta, "duration", 15)
-        df_injected.loc[s : s + dur - 1, "ground_truth_category"] = cat_name
-        df_injected.loc[s : s + dur - 1, "is_anomaly"] = 1
+        s = meta.start_idx
+        e = meta.end_idx
+        df_injected.loc[s : e - 1, "ground_truth_category"] = cat_name
+        df_injected.loc[s : e - 1, "is_anomaly"] = 1
         anomalies_meta.append(meta)
         idx += spacing
 
@@ -209,20 +209,24 @@ def evaluate_benchmark():
     t_eval_start = time.time()
 
     for i in range(len(df_test)):
-        # Construct synchronized mesonet neighbor telemetry
+        # Construct synchronized mesonet neighbor telemetry from actual historical neighbor station CSVs
         neighbor_telemetry = {}
-        for nid in neighbor_ids:
-            neighbor_telemetry[nid] = {
-                "temperature": float(raw_temps[i] + np.random.normal(0.0, 0.7)),
-                "pressure": float(raw_press[i] + np.random.normal(0.0, 0.5)),
-                "humidity": float(np.clip(raw_humis[i] + np.random.normal(0.0, 2.0), 0, 100)),
-            }
-
-        # If current step is a genuine weather event, the ambient air mass shifts across all peers
-        if is_weathers[i] == 1:
-            for nid in neighbor_telemetry:
-                neighbor_telemetry[nid]["temperature"] = temps[i] + float(np.random.normal(0.0, 0.4))
-                neighbor_telemetry[nid]["pressure"] = press[i] + float(np.random.normal(0.0, 0.5))
+        for nid, ndf in neighbors_dfs.items():
+            if i < len(ndf):
+                n_t = float(ndf.loc[i, "temperature"])
+                n_p = float(ndf.loc[i, "pressure"])
+                n_h = float(ndf.loc[i, "humidity"])
+                
+                # If current step is a genuine weather event, the ambient air mass shifts across all peers
+                if is_weathers[i] == 1:
+                    n_t = temps[i] + float(n_t - raw_temps[i])
+                    n_p = press[i] + float(n_p - raw_press[i])
+                
+                neighbor_telemetry[nid] = {
+                    "temperature": n_t,
+                    "pressure": n_p,
+                    "humidity": n_h,
+                }
 
         reading = SensorReading(
             timestamp=times[i],
@@ -257,23 +261,50 @@ def evaluate_benchmark():
     logger.info(f"Stream evaluation finished in {total_time:.2f}s ({len(df_test)/total_time:.1f} ops/sec)")
 
     # 7. Compute Rigorous Metrics
+    # 7. Compute Rigorous Binary & Per-Class Metrics
     def calc_stats(y_t, y_p):
         p = float(precision_score(y_t, y_p, zero_division=0))
         r = float(recall_score(y_t, y_p, zero_division=0))
         f1 = float(f1_score(y_t, y_p, zero_division=0))
         acc = float(accuracy_score(y_t, y_p))
-        tn, fp, fn, tp = confusion_matrix(y_t, y_p).ravel() if len(np.unique(y_t)) > 1 else (len(y_t), 0, 0, 0)
+        if len(np.unique(y_t)) > 1:
+            tn, fp, fn, tp = confusion_matrix(y_t, y_p, labels=[0, 1]).ravel()
+        else:
+            tn, fp, fn, tp = len(y_t), 0, 0, 0
         far = float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0
         pod = float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
-        return {"precision": p, "recall": r, "f1": f1, "accuracy": acc, "far": far, "pod": pod}
+        return {"precision": p, "recall": r, "f1": f1, "accuracy": acc, "far": far, "pod": pod, "tp": int(tp), "fp": int(fp), "tn": int(tn), "fn": int(fn)}
 
     m1 = calc_stats(y_true_anomaly, y_pred_t1)
     m2 = calc_stats(y_true_anomaly, y_pred_t2)
     mf = calc_stats(y_true_anomaly, y_pred_final)
 
-    logger.info(f"Tier 1 (Edge Rules)     | Precision: {m1['precision']:.4f} | Recall: {m1['recall']:.4f} | F1: {m1['f1']:.4f} | FAR: {m1['far']:.4f}")
-    logger.info(f"Tier 2 (Autoencoder)    | Precision: {m2['precision']:.4f} | Recall: {m2['recall']:.4f} | F1: {m2['f1']:.4f} | FAR: {m2['far']:.4f}")
-    logger.info(f"Final Pipeline (Tier 3) | Precision: {mf['precision']:.4f} | Recall: {mf['recall']:.4f} | F1: {mf['f1']:.4f} | FAR: {mf['far']:.4f}")
+    # Per-Class Evaluation Breakdown
+    all_gt_classes = sorted(list(set(y_true_category + y_pred_category)))
+    per_class_metrics = {}
+    for cls_name in all_gt_classes:
+        y_t_cls = [1 if c == cls_name else 0 for c in y_true_category]
+        y_p_cls = [1 if c == cls_name else 0 for c in y_pred_category]
+        if sum(y_t_cls) > 0 or sum(y_p_cls) > 0:
+            tp_c = sum(1 for gt, pr in zip(y_true_category, y_pred_category) if gt == cls_name and pr == cls_name)
+            fp_c = sum(1 for gt, pr in zip(y_true_category, y_pred_category) if gt != cls_name and pr == cls_name)
+            fn_c = sum(1 for gt, pr in zip(y_true_category, y_pred_category) if gt == cls_name and pr != cls_name)
+            p_c = float(tp_c / (tp_c + fp_c)) if (tp_c + fp_c) > 0 else 0.0
+            r_c = float(tp_c / (tp_c + fn_c)) if (tp_c + fn_c) > 0 else 0.0
+            f1_c = float(2 * p_c * r_c / (p_c + r_c)) if (p_c + r_c) > 0 else 0.0
+            per_class_metrics[cls_name] = {
+                "support": int(sum(y_t_cls)),
+                "tp": tp_c,
+                "fp": fp_c,
+                "fn": fn_c,
+                "precision": round(p_c, 4),
+                "recall": round(r_c, 4),
+                "f1": round(f1_c, 4),
+            }
+
+    logger.info(f"Tier 1 (Edge Rules)     | Precision: {m1['precision']:.4f} | Recall: {m1['recall']:.4f} | F1: {m1['f1']:.4f} | FAR: {m1['far']:.4f} | TP: {m1['tp']}, FP: {m1['fp']}, FN: {m1['fn']}")
+    logger.info(f"Tier 2 (Autoencoder)    | Precision: {m2['precision']:.4f} | Recall: {m2['recall']:.4f} | F1: {m2['f1']:.4f} | FAR: {m2['far']:.4f} | TP: {m2['tp']}, FP: {m2['fp']}, FN: {m2['fn']}")
+    logger.info(f"Final Pipeline (Tier 3) | Precision: {mf['precision']:.4f} | Recall: {mf['recall']:.4f} | F1: {mf['f1']:.4f} | FAR: {mf['far']:.4f} | TP: {mf['tp']}, FP: {mf['fp']}, FN: {mf['fn']}")
 
     # Latency Stats
     lat_stats = {
@@ -345,6 +376,14 @@ def evaluate_benchmark():
     plt.savefig(chart2_path)
     plt.close()
 
+    # Format per-class table markdown
+    pc_table_rows = []
+    for cls_name, pstats in per_class_metrics.items():
+        pc_table_rows.append(
+            f"| **{cls_name}** | `{pstats['support']}` | `{pstats['tp']}` | `{pstats['fp']}` | `{pstats['fn']}` | `{pstats['precision']:.4f}` | `{pstats['recall']:.4f}` | `{pstats['f1']:.4f}` |"
+        )
+    pc_table_str = "\n".join(pc_table_rows)
+
     # 9. Save JSON Summary
     benchmark_data = {
         "target_station": target_id,
@@ -356,6 +395,7 @@ def evaluate_benchmark():
             "tier2": m2,
             "final_pipeline": mf,
         },
+        "per_class_metrics": per_class_metrics,
         "latency_profile_ms": lat_stats,
     }
     with open(reports_dir / "results.json", "w", encoding="utf-8") as f:
@@ -378,11 +418,22 @@ This benchmark report evaluates the production-trained **SkyGuard AI Multi-Tier 
 | **F1 Score** | `{m1['f1']:.4f}` | `{m2['f1']:.4f}` | **`{mf['f1']:.4f}`** | `> 0.900` |
 | **Accuracy** | `{m1['accuracy']*100:.2f}%` | `{m2['accuracy']*100:.2f}%` | **`{mf['accuracy']*100:.2f}%`** | `> 98.0%` |
 | **False Alarm Rate (FAR)** | `{m1['far']:.4f}` | `{m2['far']:.4f}` | **`{mf['far']:.4f}`** | `< 0.050` |
+| **True Positives (TP)** | `{m1['tp']}` | `{m2['tp']}` | **`{mf['tp']}`** | — |
+| **False Positives (FP)** | `{m1['fp']}` | `{m2['fp']}` | **`{mf['fp']}`** | — |
+| **False Negatives (FN)** | `{m1['fn']}` | `{m2['fn']}` | **`{mf['fn']}`** | — |
 | **Mean Latency (ms)** | `{lat_stats['tier1_mean']:.3f} ms` | `{lat_stats['tier2_mean']:.3f} ms` | **`{lat_stats['total_mean']:.3f} ms`** | `< 10.0 ms` |
 
 ---
 
-## 2. Production Performance Visualizations
+## 2. Per-Class Anomaly & Weather Event Performance
+
+| Category | Support | TP | FP | FN | Precision | Recall | F1 Score |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+{pc_table_str}
+
+---
+
+## 3. Production Performance Visualizations
 
 ### Multi-Tier Performance Benchmark
 ![SkyGuard AI Performance Metrics](figures/performance_metrics.png)
@@ -392,7 +443,7 @@ This benchmark report evaluates the production-trained **SkyGuard AI Multi-Tier 
 
 ---
 
-## 3. Latency & Edge Feasibility Profile
+## 4. Latency & Edge Feasibility Profile
 
 The end-to-end pipeline operates strictly within sub-10ms real-time constraints, ensuring feasibility on edge microcontrollers (ESP32/ARM Cortex-M4) for Tier 1 and Tier 2, with cloud/gateway orchestration for Tier 3:
 
@@ -405,21 +456,11 @@ The end-to-end pipeline operates strictly within sub-10ms real-time constraints,
 
 ---
 
-## 4. Test Configuration & Indian Dataset Coverage
+## 5. Test Configuration & Indian Dataset Coverage
 
 - **Target Station**: `{target_id}` (`{station_name}`)
 - **Total Test Observations**: `{len(df_test):,}` readings
-- **Injected Anomaly Patterns**: `{sum(y_true_anomaly):,}` points covering all 10 root cause classes:
-  1. *Sensor Spike* (single-timestep extreme excursion)
-  2. *Frozen / Stuck Sensor* (zero-variance persistence)
-  3. *Calibration Drift* (subtle progressive bias)
-  4. *Communication Dropout* (NaN / missing telemetry)
-  5. *Packet Corruption* (transmission bitflip errors)
-  6. *Physical Inconsistency* (Dew Point > Air Temp thermodynamic violation)
-  7. *Noise / Jitter* (degraded SNR variance)
-  8. *Range Violation* (climatological boundary breach)
-  9. *Spatial Inconsistency* (divergence from local mesonet consensus)
-  10. *Temporal Pattern Break* (diurnal inversion)
+- **Injected Anomaly Patterns**: `{sum(y_true_anomaly):,}` points covering all 10 root cause classes
 - **Severe Weather Discrimination**: Evaluated against simulated monsoon downbursts (-9.5 deg C, -12 hPa) with spatial peer confirmation.
 - **Model Artifacts**: Persisted in `models/` (`tier2_autoencoder.pth`, `tier2_weights.h`, `tier3_weather_arbiter.json`, `tier3_fault_diagnoser.json`, `tier3_isoforest.joblib`).
 """

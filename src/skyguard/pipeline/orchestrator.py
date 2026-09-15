@@ -183,15 +183,11 @@ class SkyGuardPipeline:
             is_anomaly = True
             final_status = QCStatus.FAIL
             severity = Severity.HIGH
-        elif sat_out.is_satellite_inconsistent:
+        elif arbiter_out and arbiter_out.anomaly_category != AnomalyCategory.NONE and arbiter_out.confidence >= 0.50:
             is_anomaly = True
             final_status = QCStatus.FAIL
             severity = Severity.HIGH
-        elif arbiter_out.anomaly_category != AnomalyCategory.NONE:
-            is_anomaly = True
-            final_status = QCStatus.FAIL
-            severity = Severity.HIGH
-        elif t2_out.anomaly_score > 0.85:
+        elif t2_out.anomaly_score > 0.88:
             is_anomaly = True
             final_status = QCStatus.FAIL
             severity = Severity.HIGH

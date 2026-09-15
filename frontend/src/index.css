@@ -1,23 +1,26 @@
 :root {
-  --bg-main: #0d1117;
-  --bg-panel: #161b22;
-  --bg-card: #21262d;
-  --bg-card-hover: #30363d;
-  --border-subtle: #30363d;
-  --border-active: #58a6ff;
+  --bg-main: #000000;
+  --bg-panel: #05070c;
+  --bg-card: #090d16;
+  --bg-card-hover: #0f1522;
+  --border-subtle: #192233;
+  --border-active: #38bdf8;
 
-  --text-primary: #f0f6fc;
-  --text-secondary: #8b949e;
-  --text-muted: #6e7681;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
 
-  --accent-blue: #58a6ff;
-  --accent-green: #3fb950;
-  --accent-amber: #d29922;
-  --accent-red: #f85149;
-  --accent-purple: #bc8cff;
+  --accent-blue: #38bdf8;
+  --accent-green: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-purple: #a855f7;
 
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', SFMono-Regular, monospace;
+
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -37,39 +40,65 @@ body {
   line-height: 1.5;
 }
 
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+}
+
+.tracking-tight {
+  letter-spacing: -0.035em;
+}
+
+.leading-tight {
+  line-height: 1.15;
+}
+
 /* Custom Minimal Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0d1117;
+  background: #000000;
 }
 ::-webkit-scrollbar-thumb {
-  background: #30363d;
+  background: #1e293b;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #58a6ff;
+  background: #38bdf8;
 }
 
 /* Clean Structural Panels */
 .glass-panel {
   background: var(--bg-panel);
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .glass-card {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  border-radius: 8px;
+  transition: background 0.3s var(--ease-smooth), border-color 0.3s var(--ease-smooth), transform 0.3s var(--ease-smooth);
 }
 .glass-card:hover {
   background: var(--bg-card-hover);
-  border-color: #8b949e;
+  border-color: #334155;
 }
+
+/* Information Guide Banner */
+.info-guide-banner {
+  background: #090e17;
+  border: 1px solid #1e293b;
+  border-left: 3px solid #38bdf8;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
 
 /* Metric Cards */
 .metric-card {
@@ -293,3 +322,72 @@ body {
 .leaflet-tooltip-top:before {
   border-top-color: #30363d;
 }
+
+/* Ensure Leaflet Attribution is cleanly placed and visible without overlapping */
+.leaflet-bottom.leaflet-right {
+  bottom: 8px !important;
+  right: 10px !important;
+  font-size: 10px !important;
+  opacity: 0.85;
+}
+
+/* --- MOBILE & TABLET RESPONSIVE MEDIA QUERIES --- */
+@media (max-width: 900px) {
+  body {
+    overflow-y: auto !important;
+    height: auto !important;
+  }
+
+  .main-workspace {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(360px, 45vh) minmax(400px, 1fr) !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .app-header {
+    height: auto !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+  }
+
+  .header-actions-group {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px !important;
+  }
+
+  .search-container-input {
+    width: 140px !important;
+  }
+  .search-container-input:focus {
+    width: 180px !important;
+  }
+
+  .anomaly-sandbox-bar {
+    bottom: 8px !important;
+    left: 8px !important;
+    max-width: calc(100% - 16px) !important;
+  }
+
+  .map-header-legend {
+    top: 8px !important;
+    right: 8px !important;
+    padding: 6px 10px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .metric-number {
+    font-size: 1.1rem !important;
+  }
+  .search-container-input {
+    width: 120px !important;
+  }
+  .header-title-text {
+    font-size: 0.85rem !important;
+  }
+}
+

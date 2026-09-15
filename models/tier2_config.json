@@ -23,7 +23,7 @@
     1.1026616241775928,
     1.0508563456446482
   ],
-  "threshold": 0.249171644449234,
+  "threshold": 0.26423579454421997,
   "input_dim": 10,
   "bottleneck_dim": 4,
   "feature_names": [

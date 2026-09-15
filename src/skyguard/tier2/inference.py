@@ -117,8 +117,9 @@ class Tier2InferenceEngine:
         _, error = self.forward(x_scaled)
         mse = float(np.mean(error))
 
-        # Normalized anomaly score (sigmoid-like scaling around threshold)
-        score = 1.0 / (1.0 + np.exp(-4.0 * (mse - self.threshold) / max(1e-4, self.threshold)))
+        # Normalized anomaly score (sigmoid-like scaling centered at threshold)
+        diff = (mse - self.threshold) / max(1e-4, self.threshold)
+        score = 1.0 / (1.0 + np.exp(-6.0 * diff))
         is_anomaly = mse > self.threshold
 
         latency_ms = (time.perf_counter() - t0) * 1000.0

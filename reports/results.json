@@ -2,40 +2,171 @@
     "target_station": "42182099999",
     "station_name": "SAFDARJUNG",
     "total_readings": 2500,
-    "total_anomalies_evaluated": 193,
+    "total_anomalies_evaluated": 122,
     "metrics": {
         "tier1": {
-            "precision": 0.875,
-            "recall": 0.14507772020725387,
-            "f1": 0.24888888888888888,
-            "accuracy": 0.9324,
-            "far": 0.0017338534893801473,
-            "pod": 0.14507772020725387
+            "precision": 0.7692307692307693,
+            "recall": 0.2459016393442623,
+            "f1": 0.37267080745341613,
+            "accuracy": 0.9596,
+            "far": 0.0037846930193439865,
+            "pod": 0.2459016393442623,
+            "tp": 30,
+            "fp": 9,
+            "tn": 2369,
+            "fn": 92
         },
         "tier2": {
-            "precision": 0.19607843137254902,
-            "recall": 0.05181347150259067,
-            "f1": 0.08196721311475409,
-            "accuracy": 0.9104,
-            "far": 0.017771998266146512,
-            "pod": 0.05181347150259067
+            "precision": 0.21428571428571427,
+            "recall": 0.07377049180327869,
+            "f1": 0.10975609756097561,
+            "accuracy": 0.9416,
+            "far": 0.013877207737594618,
+            "pod": 0.07377049180327869,
+            "tp": 9,
+            "fp": 33,
+            "tn": 2345,
+            "fn": 113
         },
         "final_pipeline": {
-            "precision": 0.7681159420289855,
-            "recall": 0.27461139896373055,
-            "f1": 0.40458015267175573,
-            "accuracy": 0.9376,
-            "far": 0.006935413957520589,
-            "pod": 0.27461139896373055
+            "precision": 0.2808988764044944,
+            "recall": 0.4098360655737705,
+            "f1": 0.3333333333333333,
+            "accuracy": 0.92,
+            "far": 0.05382674516400336,
+            "pod": 0.4098360655737705,
+            "tp": 50,
+            "fp": 128,
+            "tn": 2250,
+            "fn": 72
+        }
+    },
+    "per_class_metrics": {
+        "CALIBRATION_DRIFT": {
+            "support": 48,
+            "tp": 0,
+            "fp": 0,
+            "fn": 48,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "COMMUNICATION_DROPOUT": {
+            "support": 6,
+            "tp": 0,
+            "fp": 0,
+            "fn": 6,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "FROZEN_SENSOR": {
+            "support": 12,
+            "tp": 6,
+            "fp": 23,
+            "fn": 6,
+            "precision": 0.2069,
+            "recall": 0.5,
+            "f1": 0.2927
+        },
+        "GENUINE_WEATHER_EVENT": {
+            "support": 26,
+            "tp": 19,
+            "fp": 19,
+            "fn": 7,
+            "precision": 0.5,
+            "recall": 0.7308,
+            "f1": 0.5937
+        },
+        "NOISE_JITTER": {
+            "support": 16,
+            "tp": 0,
+            "fp": 0,
+            "fn": 16,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "NONE": {
+            "support": 0,
+            "tp": 0,
+            "fp": 2284,
+            "fn": 0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "NORMAL": {
+            "support": 2353,
+            "tp": 0,
+            "fp": 0,
+            "fn": 2353,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "PACKET_CORRUPTION": {
+            "support": 1,
+            "tp": 0,
+            "fp": 0,
+            "fn": 1,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "PHYSICAL_INCONSISTENCY": {
+            "support": 4,
+            "tp": 0,
+            "fp": 9,
+            "fn": 4,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "RANGE_VIOLATION": {
+            "support": 1,
+            "tp": 1,
+            "fp": 5,
+            "fn": 0,
+            "precision": 0.1667,
+            "recall": 1.0,
+            "f1": 0.2857
+        },
+        "SENSOR_SPIKE": {
+            "support": 1,
+            "tp": 0,
+            "fp": 134,
+            "fn": 1,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "SPATIAL_INCONSISTENCY": {
+            "support": 8,
+            "tp": 0,
+            "fp": 0,
+            "fn": 8,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+        },
+        "TEMPORAL_PATTERN_BREAK": {
+            "support": 24,
+            "tp": 0,
+            "fp": 0,
+            "fn": 24,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
         }
     },
     "latency_profile_ms": {
-        "tier1_mean": 0.054925520010147014,
-        "tier2_mean": 0.2119841999869095,
-        "tier3_mean": 6.748464519999412,
-        "total_mean": 39.280052000000005,
-        "total_p50": 38.665,
-        "total_p95": 72.7105,
-        "total_p99": 103.02759999999982
+        "tier1_mean": 0.12134072000771993,
+        "tier2_mean": 0.18717919999326113,
+        "tier3_mean": 5.030892599995738,
+        "total_mean": 33.195612,
+        "total_p50": 39.6,
+        "total_p95": 50.75,
+        "total_p99": 60.553499999999914
     }
 }

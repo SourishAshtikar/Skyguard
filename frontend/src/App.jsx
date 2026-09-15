@@ -17,6 +17,8 @@ import {
   Sliders,
   Layers,
   X,
+  AlertTriangle,
+  Database
 } from 'lucide-react';
 
 import GisMap from './components/GisMap';
@@ -28,6 +30,7 @@ import SatelliteView from './components/SatelliteView';
 import AnomalySandbox from './components/AnomalySandbox';
 import CustomAnomalyModal from './components/CustomAnomalyModal';
 import StationDirectoryModal from './components/StationDirectoryModal';
+import IncidentsPanel from './components/IncidentsPanel';
 
 const getApiBase = () => {
   if (import.meta.env.VITE_API_BASE) {
@@ -58,10 +61,10 @@ export default function App() {
   const [timeStr, setTimeStr] = useState('');
 
   // UI State: Active Inspector Tab & Drawer Collapse
-  const [activeTab, setActiveTab] = useState('telemetry'); // 'telemetry' | 'diagnostics' | 'explainability' | 'spatial' | 'satellite'
+  const [activeTab, setActiveTab] = useState('telemetry'); // 'telemetry' | 'incidents' | 'diagnostics' | 'explainability' | 'spatial' | 'satellite'
   const [isInspectorOpen, setIsInspectorOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'CRITICAL' | 'WARNING' | 'WEATHER'
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [isStationDirectoryOpen, setIsStationDirectoryOpen] = useState(false);
 
@@ -98,7 +101,6 @@ export default function App() {
     setSelectedStation(station);
 
     try {
-      // Parallelize station details, telemetry history, and spaceborne satellite cross-check
       const [detailRes, telRes, satRes] = await Promise.all([
         fetch(`${API_BASE}/api/stations/${station.station_id}`),
         fetch(`${API_BASE}/api/stations/${station.station_id}/telemetry?limit=48`),
@@ -118,7 +120,6 @@ export default function App() {
         setSatelliteData(satJson);
       }
 
-      // Evaluate latest reading in pipeline
       if (telData && telData.length > 0) {
         const lastReading = telData[telData.length - 1];
         const evalRes = await fetch(`${API_BASE}/api/pipeline/evaluate`, {
@@ -141,7 +142,6 @@ export default function App() {
           setSatelliteData(evalData.satellite_cross_check);
         }
 
-        // Dynamically sync status on map pin
         const newStatus = evalData.final_anomaly
           ? 'CRITICAL'
           : evalData.final_status === 'SUSPECT'
@@ -161,7 +161,6 @@ export default function App() {
     }
   };
 
-  // On-the-fly anomaly injection
   const handleInjectAnomaly = async (anomalyType, magnitude) => {
     if (!selectedStation || telemetry.length === 0) return;
     const lastReading = telemetry[telemetry.length - 1];
@@ -192,7 +191,6 @@ export default function App() {
         setNearestNeighbors(diagResult.nearest_neighbors);
       }
 
-      // Update telemetry array so all HUDs and charts immediately reflect the injected reading
       if (diagResult?.raw_reading) {
         setTelemetry((prev) => {
           if (!prev || prev.length === 0) return prev;
@@ -208,7 +206,6 @@ export default function App() {
         });
       }
 
-      // Dynamically reflect anomaly on map pin
       const newStatus = diagResult.final_anomaly ? 'CRITICAL' : 'WARNING';
       setStations((prev) =>
         prev.map((s) =>
@@ -222,7 +219,6 @@ export default function App() {
     }
   };
 
-  // Custom user anomaly injection with direct numerical values & offsets
   const handleInjectCustomAnomaly = async (customConfig) => {
     if (!selectedStation || telemetry.length === 0) return;
     const lastReading = telemetry[telemetry.length - 1];
@@ -281,7 +277,6 @@ export default function App() {
     }
   };
 
-  // Restore nominal telemetry and reset pipeline state
   const handleRestoreNominal = async () => {
     if (selectedStation) {
       try {
@@ -298,7 +293,6 @@ export default function App() {
     }
   };
 
-  // Compute status counts for filter buttons
   const counts = useMemo(() => {
     let anomalies = 0;
     let suspect = 0;
@@ -316,7 +310,6 @@ export default function App() {
     };
   }, [stations]);
 
-  // Filter stations based on search query & status pill
   const filteredStations = useMemo(() => {
     return stations.filter((s) => {
       const matchesSearch =
@@ -330,7 +323,6 @@ export default function App() {
     });
   }, [stations, searchQuery, statusFilter]);
 
-  // Matching search results for autocomplete dropdown
   const matchingSearchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
@@ -342,24 +334,21 @@ export default function App() {
     );
   }, [stations, searchQuery]);
 
-  // Dynamic health score computed from actual pipeline state (not a static pre-assigned value)
   const rawHealthFromBackend = latestResult?.sensor_health?.health_score_pct;
   const computedHealthScore = (() => {
     if (rawHealthFromBackend != null) return rawHealthFromBackend;
-    // Build from first principles using what the pipeline actually reported
     let score = 100.0;
     const isAnom = latestResult?.final_anomaly ?? false;
     const satInconsistent = latestResult?.satellite_cross_check?.is_satellite_inconsistent ?? false;
-    const tier1Pass = !isAnom;
     const tier2Score = latestResult?.tier2?.anomaly_score ?? (isAnom ? 0.7 : 0.0);
     const battV = latestResult?.raw_reading?.battery_voltage ?? selectedStation?.last_battery ?? 12.6;
     const wmoFlag = latestResult?.wmo_qc_flag ?? (isAnom ? 2 : 0);
 
-    if (isAnom) score -= 40.0 * Math.min(1.0, tier2Score);  // anomaly penalty
-    if (satInconsistent) score -= 15.0;                      // satellite divergence
-    if (battV < 11.2) score -= 20.0;                         // low battery
-    else if (battV < 12.0) score -= 5.0;                     // marginal battery
-    if (wmoFlag === 3) score -= 10.0;                        // missing data
+    if (isAnom) score -= 40.0 * Math.min(1.0, tier2Score);
+    if (satInconsistent) score -= 15.0;
+    if (battV < 11.2) score -= 20.0;
+    else if (battV < 12.0) score -= 5.0;
+    if (wmoFlag === 3) score -= 10.0;
 
     return Math.max(0, Math.min(100, score));
   })();
@@ -367,10 +356,10 @@ export default function App() {
   const isAnomaly = latestResult?.final_anomaly ?? false;
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: '#0d1117' }}>
+    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: '#000000' }}>
       {/* Top Compact Command Header */}
       <header
-        className="glass-panel"
+        className="glass-panel app-header"
         style={{
           margin: '8px 12px 0 12px',
           padding: '6px 14px',
@@ -379,12 +368,11 @@ export default function App() {
           alignItems: 'center',
           borderRadius: '6px',
           zIndex: 10,
-          background: '#161b22',
-          border: '1px solid #30363d',
-          height: '46px',
+          background: '#05070c',
+          border: '1px solid #192233',
+          minHeight: '46px',
         }}
       >
-        {/* Compact Logo & Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
@@ -399,7 +387,7 @@ export default function App() {
           >
             <Shield size={15} color="#ffffff" />
           </div>
-          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f0f6fc', letterSpacing: '-0.01em' }}>
+          <span className="header-title-text font-display tracking-tight leading-tight" style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
             SkyGuard AI
           </span>
           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3fb950' }} title="National Mesonet Active" />
@@ -408,9 +396,7 @@ export default function App() {
           </span>
         </div>
 
-        {/* Center: Search, Directory & Status Filter Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Station Directory Trigger Button */}
+        <div className="header-actions-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             className="btn-ghost"
             onClick={() => setIsStationDirectoryOpen(true)}
@@ -428,13 +414,11 @@ export default function App() {
               fontWeight: 600,
               cursor: 'pointer',
             }}
-            title="Open Directory of All 900 Indian AWS Stations"
           >
             <Layers size={13} color="#58a6ff" />
             <span>Stations ({stations.length || 900})</span>
           </button>
 
-          {/* Search Container with Instant Autocomplete Dropdown */}
           <div style={{ position: 'relative' }}>
             <div
               style={{
@@ -445,13 +429,13 @@ export default function App() {
                 border: '1px solid #30363d',
                 borderRadius: '6px',
                 padding: '4px 8px',
-                width: '190px',
               }}
             >
               <Search size={13} color="#8b949e" />
               <input
                 type="text"
-                placeholder="Search 900 stations..."
+                className="search-container-input"
+                placeholder="Search stations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
@@ -460,7 +444,6 @@ export default function App() {
                   outline: 'none',
                   color: '#f0f6fc',
                   fontSize: '0.72rem',
-                  width: '100%',
                 }}
               />
               {searchQuery && (
@@ -473,7 +456,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Instant Search Autocomplete Dropdown */}
             {searchQuery.trim() && (
               <div
                 style={{
@@ -622,14 +604,12 @@ export default function App() {
               padding: '4px 10px',
               height: '28px',
             }}
-            title="Create & Inject Custom Anomaly"
           >
             <Sliders size={12} />
             + Anomaly
           </button>
         </div>
 
-        {/* Right: Live IST Clock & Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600, color: '#8b949e' }}>
             {timeStr}
@@ -639,7 +619,6 @@ export default function App() {
             className="btn-ghost"
             onClick={() => setIsInspectorOpen(!isInspectorOpen)}
             style={{ padding: '4px 8px', fontSize: '0.7rem', height: '28px' }}
-            title="Toggle Inspector Drawer"
           >
             {isInspectorOpen ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
           </button>
@@ -648,6 +627,7 @@ export default function App() {
 
       {/* Main Workspace Layout */}
       <main
+        className="main-workspace"
         style={{
           flex: 1,
           padding: '10px 12px 12px 12px',
@@ -657,7 +637,7 @@ export default function App() {
           overflow: 'hidden',
         }}
       >
-        {/* Left Hero: Large GIS Mesonet Map */}
+
         <div
           className="glass-panel"
           style={{
@@ -684,7 +664,6 @@ export default function App() {
             />
           )}
 
-          {/* Clean Floating Anomaly Sandbox Dock (Bottom Left) */}
           <div
             style={{
               position: 'absolute',
@@ -712,17 +691,16 @@ export default function App() {
               height: '100%',
               borderRadius: '6px',
               overflow: 'hidden',
-              background: '#161b22',
-              border: '1px solid #30363d',
+              background: '#05070c',
+              border: '1px solid #192233',
             }}
           >
-            {/* Inspector Header: Selected Station Card */}
             {selectedStation && (
               <div
                 style={{
                   padding: '10px 14px',
-                  borderBottom: '1px solid #30363d',
-                  background: '#161b22',
+                  borderBottom: '1px solid #192233',
+                  background: '#05070c',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
@@ -736,28 +714,25 @@ export default function App() {
                     <span className={`badge ${isAnomaly ? 'badge-fail' : (selectedStation.status === 'WEATHER' ? 'badge-weather' : 'badge-pass')}`}>
                       {latestResult?.final_status ?? selectedStation.status ?? 'NOMINAL'}
                     </span>
+                    {latestResult?.incident && (
+                      <span className="badge badge-purple" style={{ fontSize: '0.62rem' }}>
+                        INCIDENT: {latestResult.incident.status}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#8b949e', marginTop: '1px' }}>
                     ID: <span style={{ fontFamily: 'var(--font-mono)', color: '#58a6ff' }}>{selectedStation.station_id}</span> • Elev: {selectedStation.elevation_m}m • {(!selectedStation.state || selectedStation.state === 'nan') ? 'National Mesonet' : selectedStation.state}
                   </div>
                 </div>
 
-                {/* Sensor Health Mini-Dial — dynamically computed from pipeline */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'right' }}>
-                  <div title={[
-                    `Live Health Score — computed from actual sensor diagnostics:`,
-                    `• Base score: 100%`,
-                    latestResult?.final_anomaly ? `• Anomaly detected: −${Math.round(40 * Math.min(1, latestResult?.tier2?.anomaly_score ?? 0.7))}%` : `• No anomaly detected: 0%`,
-                    latestResult?.satellite_cross_check?.is_satellite_inconsistent ? `• Satellite divergence: −15%` : `• Satellite verified: 0%`,
-                    (latestResult?.raw_reading?.battery_voltage ?? 12.6) < 11.2 ? `• Low battery: −20%` : `• Battery OK: 0%`,
-                    `• Final: ${healthScore.toFixed(0)}%`,
-                  ].join('\n')} style={{ cursor: 'help' }}>
+                  <div>
                     <div style={{ fontSize: '0.62rem', color: '#8b949e', fontWeight: 600 }}>HEALTH</div>
                     <div style={{ fontSize: '1rem', fontWeight: 700, color: healthScore > 95 ? '#3fb950' : (healthScore > 75 ? '#d29922' : '#f85149'), fontFamily: 'var(--font-mono)' }}>
                       {healthScore.toFixed(0)}%
                     </div>
                     <div style={{ fontSize: '0.55rem', color: healthScore > 95 ? '#3fb950' : '#d29922', fontWeight: 600 }}>
-                      {healthScore >= 100 ? '✓ ALL CLEAR' : healthScore > 90 ? 'GOOD' : healthScore > 75 ? 'DEGRADED' : 'FAULT'}
+                      {healthScore >= 100 ? 'ALL CLEAR' : healthScore > 90 ? 'GOOD' : healthScore > 75 ? 'DEGRADED' : 'FAULT'}
                     </div>
                   </div>
                   {healthScore > 90 ? (
@@ -766,7 +741,6 @@ export default function App() {
                     <ShieldAlert size={20} color={healthScore > 60 ? '#d29922' : '#f85149'} />
                   )}
                 </div>
-
               </div>
             )}
 
@@ -785,6 +759,14 @@ export default function App() {
               >
                 <ChartIcon size={14} />
                 Telemetry
+              </button>
+
+              <button
+                className={`tab-btn ${activeTab === 'incidents' ? 'active' : ''}`}
+                onClick={() => setActiveTab('incidents')}
+              >
+                <AlertTriangle size={14} color="#f85149" />
+                Incidents &amp; Reliability
               </button>
 
               <button
@@ -832,6 +814,14 @@ export default function App() {
                 />
               )}
 
+              {activeTab === 'incidents' && (
+                <IncidentsPanel
+                  station={selectedStation}
+                  latestResult={latestResult}
+                  apiBase={API_BASE}
+                />
+              )}
+
               {activeTab === 'diagnostics' && (
                 <DiagnosticTrace latestResult={latestResult} />
               )}
@@ -866,7 +856,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Custom User Anomaly Injector Modal */}
       <CustomAnomalyModal
         isOpen={isCustomModalOpen}
         onClose={() => setIsCustomModalOpen(false)}
@@ -875,7 +864,6 @@ export default function App() {
         latestResult={latestResult}
       />
 
-      {/* Complete 543 Indian AWS Observatories Directory Modal */}
       <StationDirectoryModal
         isOpen={isStationDirectoryOpen}
         onClose={() => setIsStationDirectoryOpen(false)}

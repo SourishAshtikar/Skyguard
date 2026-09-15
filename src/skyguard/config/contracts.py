@@ -38,6 +38,7 @@ class AnomalyCategory(str, Enum):
     RANGE_VIOLATION = "RANGE_VIOLATION"
     SPATIAL_INCONSISTENCY = "SPATIAL_INCONSISTENCY"
     TEMPORAL_PATTERN_BREAK = "TEMPORAL_PATTERN_BREAK"
+    UNKNOWN = "UNKNOWN"
 
 
 @dataclass
@@ -141,6 +142,17 @@ class SpatialConsensusOutput:
     target_deviation_humi: float = 0.0
     spatial_consensus_score: float = 1.0  # 0.0 (anomalous deviation) to 1.0 (perfect consensus)
     is_spatially_inconsistent: bool = False
+    valid_peer_count: int = 0
+    healthy_peer_count: int = 0
+    effective_peer_count: float = 0.0
+    peer_mad_temp: float = 0.0
+    peer_mad_pres: float = 0.0
+    peer_mad_humi: float = 0.0
+    temp_absolute_residual: float = 0.0
+    temp_change_residual: float = 0.0
+    spatial_confidence: float = 1.0
+    spatial_status: str = "CONSISTENT_WITH_PEERS"
+    evidence: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -270,6 +282,17 @@ class DiagnosticResult:
                 "median_temp": self.spatial_consensus.median_temp,
                 "median_pres": self.spatial_consensus.median_pres,
                 "median_humi": self.spatial_consensus.median_humi,
+                "valid_peer_count": getattr(self.spatial_consensus, "valid_peer_count", self.spatial_consensus.neighbor_count),
+                "healthy_peer_count": getattr(self.spatial_consensus, "healthy_peer_count", self.spatial_consensus.neighbor_count),
+                "effective_peer_count": getattr(self.spatial_consensus, "effective_peer_count", float(self.spatial_consensus.neighbor_count)),
+                "peer_mad_temp": getattr(self.spatial_consensus, "peer_mad_temp", 0.0),
+                "peer_mad_pres": getattr(self.spatial_consensus, "peer_mad_pres", 0.0),
+                "peer_mad_humi": getattr(self.spatial_consensus, "peer_mad_humi", 0.0),
+                "temp_absolute_residual": getattr(self.spatial_consensus, "temp_absolute_residual", self.spatial_consensus.target_deviation_temp),
+                "temp_change_residual": getattr(self.spatial_consensus, "temp_change_residual", 0.0),
+                "spatial_confidence": getattr(self.spatial_consensus, "spatial_confidence", 1.0),
+                "spatial_status": getattr(self.spatial_consensus, "spatial_status", "CONSISTENT_WITH_PEERS"),
+                "evidence": getattr(self.spatial_consensus, "evidence", {}),
             } if self.spatial_consensus else None,
             "satellite_cross_check": {
                 "satellite_id": self.satellite_cross_check.satellite_id,

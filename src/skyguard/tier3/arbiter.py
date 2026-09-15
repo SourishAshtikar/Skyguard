@@ -33,6 +33,7 @@ CAUSE_CLASSES: List[str] = [
     AnomalyCategory.RANGE_VIOLATION.value,
     AnomalyCategory.SPATIAL_INCONSISTENCY.value,
     AnomalyCategory.TEMPORAL_PATTERN_BREAK.value,
+    AnomalyCategory.UNKNOWN.value,
 ]
 
 
@@ -147,6 +148,17 @@ class HierarchicalArbiter:
         X, feature_names = self._build_feature_vector(features, spatial_consensus, mahalanobis_d2)
 
         # 1. Deterministic high-priority checks
+        if "MISSING_TELEMETRY" in tier1_fired_rules:
+            latency_ms = (time.perf_counter() - t0) * 1000.0
+            return Stage3ArbiterOutput(
+                is_weather_event=False,
+                anomaly_category=AnomalyCategory.COMMUNICATION_DROPOUT,
+                root_cause_label="Communication Dropout: Sensor reading missing or unreadable (NaN)",
+                confidence=0.99,
+                shap_attributions={},
+                latency_ms=latency_ms,
+            )
+
         if "DEW_POINT_INVARIANT" in tier1_fired_rules:
             latency_ms = (time.perf_counter() - t0) * 1000.0
             return Stage3ArbiterOutput(
@@ -215,11 +227,11 @@ class HierarchicalArbiter:
 
         is_suspect_reading = (
             len(tier1_fired_rules) > 0 or
-            tier2_score > 0.70 or
-            mahalanobis_d2 > 13.816 or  # Chi-square df=3 p=0.003
+            tier2_score > 0.85 or
+            mahalanobis_d2 > 25.0 or  # True anomaly Mahalanobis distance threshold
             is_spatially_inconsistent or
-            is_sat_inconsistent or
-            s_score < 0.45 or
+            (is_sat_inconsistent and (len(tier1_fired_rules) > 0 or s_score < 0.60)) or
+            s_score < 0.40 or
             is_convective_storm
         )
 
@@ -273,24 +285,26 @@ class HierarchicalArbiter:
                 probs = self.diagnoser_model.predict_proba(X)[0]
                 cause_idx = int(np.argmax(probs))
                 confidence = float(probs[cause_idx])
+                cat_val = CAUSE_CLASSES[cause_idx % len(CAUSE_CLASSES)]
                 
-                # If prediction is low confidence and no hard physical rules fired, keep nominal
-                if confidence < 0.35 and len(tier1_fired_rules) == 0 and tier2_score < 0.85 and not is_spatially_inconsistent and not is_sat_inconsistent:
+                # Assign fault category only if high model confidence or Tier 1 / spatial failure
+                if confidence < 0.55 and len(tier1_fired_rules) == 0 and not is_spatially_inconsistent:
                     cat = AnomalyCategory.NONE
                     root_label = "Nominal Atmospheric Condition"
-                    confidence = 0.90
-                else:
-                    cat_val = CAUSE_CLASSES[cause_idx % len(CAUSE_CLASSES)]
-                    cat = AnomalyCategory(cat_val)
-                    if cat == AnomalyCategory.NONE:
-                        if "STEP_CHECK" in tier1_fired_rules or tier2_score > 0.80:
-                            cat = AnomalyCategory.SENSOR_SPIKE
-                            root_label = "Sensor / Telemetry Fault: Sensor Spike"
-                        else:
-                            root_label = "Nominal Atmospheric Condition"
+                    confidence = 0.92
+                elif cat_val == AnomalyCategory.NONE.value:
+                    if "STEP_CHECK" in tier1_fired_rules or tier2_score > 0.88:
+                        cat = AnomalyCategory.SENSOR_SPIKE
+                        root_label = "Sensor / Telemetry Fault: Sensor Spike"
+                        confidence = max(0.85, confidence)
                     else:
-                        root_label = f"Sensor / Telemetry Fault: {cat.value.replace('_', ' ').title()}"
-                    if len(tier1_fired_rules) > 0 or tier2_score > 0.85 or mahalanobis_d2 > 25.0 or is_sat_inconsistent:
+                        cat = AnomalyCategory.NONE
+                        root_label = "Nominal Atmospheric Condition"
+                        confidence = 0.90
+                else:
+                    cat = AnomalyCategory(cat_val)
+                    root_label = f"Sensor / Telemetry Fault: {cat.value.replace('_', ' ').title()}"
+                    if len(tier1_fired_rules) > 0 or tier2_score > 0.88 or mahalanobis_d2 > 25.0:
                         confidence = max(0.92, confidence)
 
             # Compute feature attributions on diagnosed events

@@ -59,6 +59,7 @@ export default function ShapPanel({ latestResult }) {
           background: '#161b22',
         }}
       >
+
         {/* RCA Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

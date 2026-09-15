@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, RotateCcw, Play, ChevronDown, Sliders } from 'lucide-react';
+import { Zap, RotateCcw, Play, Sliders } from 'lucide-react';
 
 export default function AnomalySandbox({ onInject, onRestore, onOpenCustom, isSimulating }) {
   const [anomalyType, setAnomalyType] = useState('SPIKE');
@@ -11,22 +11,24 @@ export default function AnomalySandbox({ onInject, onRestore, onOpenCustom, isSi
 
   return (
     <div
-      className="glass-panel"
+      className="glass-panel anomaly-sandbox-bar"
       style={{
-        padding: '6px 12px',
+        padding: '6px 10px',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: '6px',
         background: '#161b22',
         border: '1px solid #30363d',
         borderRadius: '6px',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+        flexWrap: 'wrap',
+        maxWidth: '100%',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <Zap size={14} color="#d29922" />
-        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b949e', whiteSpace: 'nowrap' }}>
-          FAULT INJECTION:
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <Zap size={13} color="#d29922" />
+        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b949e', whiteSpace: 'nowrap' }}>
+          FAULT SIMULATOR:
         </span>
       </div>
 
@@ -39,10 +41,11 @@ export default function AnomalySandbox({ onInject, onRestore, onOpenCustom, isSi
           color: '#f0f6fc',
           border: '1px solid #30363d',
           borderRadius: '4px',
-          padding: '4px 8px',
-          fontSize: '0.72rem',
+          padding: '4px 6px',
+          fontSize: '0.7rem',
           outline: 'none',
           cursor: 'pointer',
+          maxWidth: '170px',
         }}
       >
         <option value="SPIKE">Sensor Spike (+18°C)</option>
@@ -55,47 +58,52 @@ export default function AnomalySandbox({ onInject, onRestore, onOpenCustom, isSi
         <option value="RANGE">Physical Range Violation (64.5°C)</option>
       </select>
 
-      {/* Preset Inject Button */}
-      <button
-        className="btn-ghost"
-        onClick={handleInjectClick}
-        disabled={isSimulating}
-        style={{
-          fontSize: '0.72rem',
-          padding: '4px 10px',
-          color: '#f85149',
-          borderColor: 'rgba(248, 81, 73, 0.4)',
-        }}
-      >
-        <Play size={11} />
-        Inject Fault
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+        {/* Preset Inject Button */}
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={handleInjectClick}
+          disabled={isSimulating}
+          style={{
+            fontSize: '0.7rem',
+            padding: '3px 8px',
+            color: '#f85149',
+            borderColor: 'rgba(248, 81, 73, 0.4)',
+          }}
+        >
+          <Play size={10} />
+          Inject
+        </button>
 
-      {/* Custom Anomaly Builder Modal Trigger */}
-      <button
-        type="button"
-        className="btn-ghost"
-        onClick={onOpenCustom}
-        style={{
-          fontSize: '0.72rem',
-          padding: '4px 10px',
-          color: '#58a6ff',
-          borderColor: 'rgba(88, 166, 255, 0.4)',
-        }}
-        title="Open Custom Anomaly Builder with direct values and offset sliders"
-      >
-        <Sliders size={11} />
-        Custom Fault
-      </button>
+        {/* Custom Anomaly Builder Modal Trigger */}
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={onOpenCustom}
+          style={{
+            fontSize: '0.7rem',
+            padding: '3px 8px',
+            color: '#58a6ff',
+            borderColor: 'rgba(88, 166, 255, 0.4)',
+          }}
+          title="Open Custom Anomaly Builder with direct values and offset sliders"
+        >
+          <Sliders size={10} />
+          Custom
+        </button>
 
-      <button
-        className="btn-ghost"
-        onClick={onRestore}
-        style={{ fontSize: '0.72rem', padding: '4px 10px' }}
-      >
-        <RotateCcw size={11} />
-        Restore Nominal
-      </button>
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={onRestore}
+          style={{ fontSize: '0.7rem', padding: '3px 8px' }}
+        >
+          <RotateCcw size={10} />
+          Restore
+        </button>
+      </div>
     </div>
   );
 }
+

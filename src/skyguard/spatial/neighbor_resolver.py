@@ -1,10 +1,12 @@
 """
-SkyGuard AI — Spatial Neighbor Resolver
-Computes Haversine distances across India's 545 AWS stations and performs spatial consensus checks:
-- Multi-station nearest neighbor lookup
-- Cluster median and MAD (Median Absolute Deviation)
-- Target deviation scoring
-- Isolated station graceful fallback
+SkyGuard AI — Robust Mesonet Peer Consensus & Spatial Neighbor Resolver
+Computes Haversine distances across India's AWS stations and evaluates peer spatial consensus:
+- Quality-aware & health-aware peer candidate selection
+- Bounded distance-weighting with zero-distance safeguards
+- Robust weighted-median consensus & MAD (Median Absolute Deviation) scale estimation
+- Temporal change agreement (station_delta vs peer_consensus_delta)
+- Multi-state spatial classification (CONSISTENT_WITH_PEERS, LOCALIZED_SENSOR_FAULT,
+  REGIONAL_WEATHER_EVENT, UNCERTAIN_SPATIAL_EVIDENCE, NO_VALID_PEERS)
 """
 
 from pathlib import Path
@@ -13,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from skyguard.config.contracts import SpatialConsensusOutput
+from skyguard.config.settings import SETTINGS
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -27,13 +30,39 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return float(r * c)
 
 
+def compute_weighted_median(values: List[float], weights: List[float]) -> float:
+    """Computes robust weighted median of values given non-negative weights."""
+    if not values:
+        return 0.0
+    if len(values) == 1:
+        return float(values[0])
+
+    val_arr = np.array(values, dtype=float)
+    w_arr = np.array(weights, dtype=float)
+
+    if np.sum(w_arr) <= 0:
+        return float(np.median(val_arr))
+
+    sort_idx = np.argsort(val_arr)
+    sorted_vals = val_arr[sort_idx]
+    sorted_weights = w_arr[sort_idx]
+
+    cumsum = np.cumsum(sorted_weights)
+    cutoff = np.sum(sorted_weights) / 2.0
+
+    idx = np.searchsorted(cumsum, cutoff)
+    if idx >= len(sorted_vals):
+        idx = len(sorted_vals) - 1
+    return float(sorted_vals[idx])
+
+
 class SpatialNeighborResolver:
-    """Resolves nearest neighbor AWS stations and computes spatial consistency metrics."""
+    """Resolves nearest neighbor AWS stations and evaluates robust spatial consistency metrics."""
 
     def __init__(
         self,
         metadata_csv_path: Optional[Union[str, Path]] = None,
-        search_radius_km: float = 150.0,
+        search_radius_km: float = 350.0,
         min_neighbors: int = 2,
         max_neighbors: int = 5,
     ):
@@ -42,6 +71,7 @@ class SpatialNeighborResolver:
         self.max_neighbors = max_neighbors
         self.stations_df: Optional[pd.DataFrame] = None
         self._neighbor_cache: Dict[Tuple[str, Optional[float]], List[Dict[str, Any]]] = {}
+        self._prev_readings: Dict[str, Dict[str, float]] = {}
 
         if metadata_csv_path:
             self.load_metadata(metadata_csv_path)
@@ -53,10 +83,8 @@ class SpatialNeighborResolver:
             raise FileNotFoundError(f"AWS metadata file not found at {csv_path}")
 
         df = pd.read_csv(csv_path)
-        # Normalize column names
         df.columns = [c.upper().strip() for c in df.columns]
-        # Required columns: STATION_ID, LATITUDE, LONGITUDE
-        df["STATION_ID"] = df["STATION_ID"].astype(str)
+        df["STATION_ID"] = df["STATION_ID"].astype(str).str.split('.').str[0]
         df["LATITUDE"] = pd.to_numeric(df["LATITUDE"], errors="coerce")
         df["LONGITUDE"] = pd.to_numeric(df["LONGITUDE"], errors="coerce")
         df = df.dropna(subset=["LATITUDE", "LONGITUDE"]).reset_index(drop=True)
@@ -67,7 +95,8 @@ class SpatialNeighborResolver:
         self, station_id: str, max_radius_km: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """Finds closest stations within search radius with instant caching."""
-        cache_key = (str(station_id), max_radius_km)
+        sid_str = str(station_id).split('.')[0]
+        cache_key = (sid_str, max_radius_km)
         if cache_key in self._neighbor_cache:
             return self._neighbor_cache[cache_key]
 
@@ -75,17 +104,19 @@ class SpatialNeighborResolver:
             return []
 
         radius = max_radius_km or self.search_radius_km
-        target_rows = self.stations_df[self.stations_df["STATION_ID"] == str(station_id)]
-        if target_rows.empty:
-            return []
+        target_rows = self.stations_df[self.stations_df["STATION_ID"] == sid_str]
 
-        t_lat = float(target_rows.iloc[0]["LATITUDE"])
-        t_lon = float(target_rows.iloc[0]["LONGITUDE"])
+        if not target_rows.empty:
+            t_lat = float(target_rows.iloc[0]["LATITUDE"])
+            t_lon = float(target_rows.iloc[0]["LONGITUDE"])
+        else:
+            t_lat = float(self.stations_df.iloc[0]["LATITUDE"])
+            t_lon = float(self.stations_df.iloc[0]["LONGITUDE"])
 
         neighbors = []
         for _, row in self.stations_df.iterrows():
             s_id = str(row["STATION_ID"])
-            if s_id == str(station_id):
+            if s_id == sid_str:
                 continue
             dist = haversine_distance(t_lat, t_lon, row["LATITUDE"], row["LONGITUDE"])
             if dist <= radius:
@@ -109,44 +140,80 @@ class SpatialNeighborResolver:
         target_temp: Optional[float],
         target_pres: Optional[float],
         target_humi: Optional[float],
-        neighbor_telemetry: Optional[Dict[str, Dict[str, float]]] = None,
+        neighbor_telemetry: Optional[Dict[str, Dict[str, Any]]] = None,
+        prev_target_temp: Optional[float] = None,
     ) -> SpatialConsensusOutput:
-        """Evaluates whether target station reading agrees with neighboring mesonet stations."""
+        """
+        Evaluates spatial consistency using quality-filtered, health-weighted,
+        distance-bounded robust consensus (weighted median + MAD + temporal change agreement).
+        """
         neighbors = self.find_nearest_neighbors(target_station_id)
         n_count = len(neighbors)
         n_ids = [n["station_id"] for n in neighbors]
         distances = [n["distance_km"] for n in neighbors]
 
-        # If isolated station or no neighbor telemetry available
-        if n_count < self.min_neighbors or not neighbor_telemetry:
+        if n_count == 0 or not neighbor_telemetry:
             return SpatialConsensusOutput(
-                neighbor_count=n_count,
-                neighbor_ids=n_ids,
-                distances_km=distances,
+                neighbor_count=0,
+                neighbor_ids=[],
+                distances_km=[],
                 median_temp=None,
                 median_pres=None,
                 median_humi=None,
                 target_deviation_temp=0.0,
-                spatial_consensus_score=1.0,  # Neutral pass when no spatial peers
+                spatial_consensus_score=1.0,
                 is_spatially_inconsistent=False,
+                valid_peer_count=0,
+                healthy_peer_count=0,
+                effective_peer_count=0.0,
+                spatial_confidence=0.0,
+                spatial_status="NO_VALID_PEERS",
+                evidence={"reason": "No spatial peers found within search radius."}
             )
 
-        # Collect available neighbor readings
-        n_temps = []
-        n_pres = []
-        n_humis = []
+        valid_peers = []
+        for n in neighbors:
+            nid = n["station_id"]
+            if nid not in neighbor_telemetry:
+                continue
 
-        for nid in n_ids:
-            if nid in neighbor_telemetry:
-                t_dat = neighbor_telemetry[nid]
-                if "temperature" in t_dat and pd.notna(t_dat["temperature"]):
-                    n_temps.append(float(t_dat["temperature"]))
-                if "pressure" in t_dat and pd.notna(t_dat["pressure"]):
-                    n_pres.append(float(t_dat["pressure"]))
-                if "humidity" in t_dat and pd.notna(t_dat["humidity"]):
-                    n_humis.append(float(t_dat["humidity"]))
+            tel = neighbor_telemetry[nid]
+            q_state = str(tel.get("quality_state", "GOOD")).upper()
+            h_status = str(tel.get("health_status", tel.get("status", "HEALTHY"))).upper()
 
-        if len(n_temps) < self.min_neighbors or target_temp is None:
+            if q_state in ["BAD", "MISSING"] or h_status in ["FAILED", "CRITICAL"]:
+                continue
+
+            health_weight = 1.0
+            if h_status in ["WATCH", "WARNING"]:
+                health_weight = 0.8
+            elif h_status in ["SUSPECT", "WEATHER"]:
+                health_weight = 0.5
+            elif h_status == "DEGRADED":
+                health_weight = 0.1
+
+            dist_km = n["distance_km"]
+            epsilon = 5.0
+            dist_weight = 1.0 / (dist_km + epsilon)
+
+            combined_weight = health_weight * dist_weight
+
+            valid_peers.append({
+                "station_id": nid,
+                "distance_km": dist_km,
+                "temperature": tel.get("temperature"),
+                "pressure": tel.get("pressure"),
+                "humidity": tel.get("humidity"),
+                "prev_temp": tel.get("prev_temperature"),
+                "health_status": h_status,
+                "weight": combined_weight,
+                "is_healthy": h_status in ["HEALTHY", "NORMAL"]
+            })
+
+        v_count = len(valid_peers)
+        healthy_count = sum(1 for p in valid_peers if p["is_healthy"])
+
+        if v_count == 0 or target_temp is None:
             return SpatialConsensusOutput(
                 neighbor_count=n_count,
                 neighbor_ids=n_ids,
@@ -157,52 +224,119 @@ class SpatialNeighborResolver:
                 target_deviation_temp=0.0,
                 spatial_consensus_score=1.0,
                 is_spatially_inconsistent=False,
+                valid_peer_count=0,
+                healthy_peer_count=0,
+                effective_peer_count=0.0,
+                spatial_confidence=0.0,
+                spatial_status="NO_VALID_PEERS" if v_count == 0 else "CONSISTENT_WITH_PEERS",
+                evidence={"reason": "No valid healthy peer telemetry available."}
             )
 
-        med_t = float(np.median(n_temps))
-        med_p = float(np.median(n_pres)) if n_pres else None
-        med_h = float(np.median(n_humis)) if n_humis else None
+        # 1. Temperature Robust Weighted Consensus & MAD
+        temp_peers = [p for p in valid_peers if p["temperature"] is not None and pd.notna(p["temperature"])]
+        t_vals = [p["temperature"] for p in temp_peers]
+        t_weights = [p["weight"] for p in temp_peers]
 
-        # 1. Temperature Median Absolute Deviation (MAD)
-        mad_t = float(np.median(np.abs(np.array(n_temps) - med_t)))
-        mad_t = max(1.0, mad_t)  # Minimum 1.0°C expected ambient dispersion
-        dev_t = abs(target_temp - med_t) if target_temp is not None else 0.0
-        z_dev_t = dev_t / (1.4826 * mad_t)
+        if not t_vals:
+            med_t = None
+            mad_t = 1.0
+            dev_t = 0.0
+            z_dev_t = 0.0
+        else:
+            med_t = compute_weighted_median(t_vals, t_weights)
+            abs_diffs = [abs(v - med_t) for v in t_vals]
+            mad_t = compute_weighted_median(abs_diffs, t_weights) if len(abs_diffs) > 1 else 1.0
+            mad_t = max(1.0, mad_t)
+            dev_t = abs(target_temp - med_t)
+            z_dev_t = dev_t / (1.4826 * mad_t)
 
-        # 2. Pressure Median Absolute Deviation (MAD)
-        dev_p = 0.0
-        z_dev_p = 0.0
-        if target_pres is not None and med_p is not None:
-            dev_p = abs(target_pres - med_p)
-            mad_p = float(np.median(np.abs(np.array(n_pres) - med_p))) if len(n_pres) > 1 else 1.0
-            mad_p = max(0.8, mad_p)
-            z_dev_p = dev_p / (1.4826 * mad_p)
+        # 2. Pressure Robust Consensus & MAD
+        pres_peers = [p for p in valid_peers if p["pressure"] is not None and pd.notna(p["pressure"])]
+        p_vals = [p["pressure"] for p in pres_peers]
+        p_weights = [p["weight"] for p in pres_peers]
+        med_p = compute_weighted_median(p_vals, p_weights) if p_vals else None
+        dev_p = abs(target_pres - med_p) if (target_pres is not None and med_p is not None) else 0.0
+        mad_p = compute_weighted_median([abs(v - med_p) for v in p_vals], p_weights) if len(p_vals) > 1 else 1.0
+        mad_p = max(0.8, mad_p)
+        z_dev_p = dev_p / (1.4826 * mad_p) if med_p is not None else 0.0
 
-        # 3. Humidity Median Absolute Deviation (MAD)
-        dev_h = 0.0
-        z_dev_h = 0.0
-        if target_humi is not None and med_h is not None:
-            dev_h = abs(target_humi - med_h)
-            mad_h = float(np.median(np.abs(np.array(n_humis) - med_h))) if len(n_humis) > 1 else 4.0
-            mad_h = max(2.5, mad_h)
-            z_dev_h = dev_h / (1.4826 * mad_h)
+        # 3. Humidity Robust Consensus & MAD
+        humi_peers = [p for p in valid_peers if p["humidity"] is not None and pd.notna(p["humidity"])]
+        h_vals = [p["humidity"] for p in humi_peers]
+        h_weights = [p["weight"] for p in humi_peers]
+        med_h = compute_weighted_median(h_vals, h_weights) if h_vals else None
+        dev_h = abs(target_humi - med_h) if (target_humi is not None and med_h is not None) else 0.0
+        mad_h = compute_weighted_median([abs(v - med_h) for v in h_vals], h_weights) if len(h_vals) > 1 else 4.0
+        mad_h = max(2.5, mad_h)
+        z_dev_h = dev_h / (1.4826 * mad_h) if med_h is not None else 0.0
 
-        # Consensus score from 0.0 (extreme divergence) to 1.0 (perfect match)
+        # 4. Temporal Change Agreement
+        station_delta = 0.0
+        peer_consensus_delta = 0.0
+        change_residual = 0.0
+
+        if prev_target_temp is not None and target_temp is not None:
+            station_delta = target_temp - prev_target_temp
+
+            peer_deltas = []
+            peer_delta_weights = []
+            for p in temp_peers:
+                if p.get("prev_temp") is not None and pd.notna(p["prev_temp"]):
+                    peer_deltas.append(p["temperature"] - p["prev_temp"])
+                    peer_delta_weights.append(p["weight"])
+
+            if peer_deltas:
+                peer_consensus_delta = compute_weighted_median(peer_deltas, peer_delta_weights)
+                change_residual = station_delta - peer_consensus_delta
+
+        if target_temp is not None:
+            self._prev_readings[target_station_id] = {"temperature": target_temp}
+
+        # 5. Spatial Confidence
+        peer_count_confidence = min(1.0, len(temp_peers) / 3.0)
+        dispersion_penalty = max(0.0, (mad_t - 2.5) / 5.0)
+        spatial_confidence = max(0.1, round(peer_count_confidence * (1.0 - dispersion_penalty), 2))
+
+        # 6. Spatial Consensus Score
         max_z = max(z_dev_t, z_dev_p, z_dev_h)
         consensus_score = float(np.exp(-0.5 * (max_z / 2.0) ** 2))
 
-        # Flag inconsistency if:
-        # - Temperature deviates > 8.0°C or z > 3.5
-        # - Pressure deviates > 5.5 hPa or z > 3.5 (calibration drift / barometric leak)
-        # - Humidity deviates > 30.0% or z > 3.5
-        is_temp_inconsistent = bool(dev_t > 8.0 or z_dev_t > 3.5)
-        is_pres_inconsistent = bool((dev_p > 5.5 or z_dev_p > 3.5) if (target_pres is not None and med_p is not None) else False)
-        is_humi_inconsistent = bool((dev_h > 30.0 or z_dev_h > 3.5) if (target_humi is not None and med_h is not None) else False)
+        # 7. Spatial Status Classification
+        if len(temp_peers) < 2 or (len(t_vals) > 2 and mad_t > 5.0):
+            spatial_status = "UNCERTAIN_SPATIAL_EVIDENCE"
+            is_inconsistent = False
+        elif abs(change_residual) < 3.0 and abs(station_delta) >= 3.0:
+            spatial_status = "REGIONAL_WEATHER_EVENT"
+            is_inconsistent = False
+        elif dev_t >= 6.5 and z_dev_t > 3.5:
+            spatial_status = "LOCALIZED_SENSOR_FAULT"
+            is_inconsistent = True
+        elif dev_t <= 2.5 and mad_t <= 3.5:
+            spatial_status = "CONSISTENT_WITH_PEERS"
+            is_inconsistent = False
+        elif consensus_score < 0.45:
+            spatial_status = "UNCERTAIN_SPATIAL_EVIDENCE"
+            is_inconsistent = bool(dev_t >= 6.5 and z_dev_t > 3.5)
+        else:
+            spatial_status = "CONSISTENT_WITH_PEERS"
+            is_inconsistent = False
 
-        is_inconsistent = bool(is_temp_inconsistent or is_pres_inconsistent or is_humi_inconsistent)
+
+        evidence = {
+            "valid_peer_count": len(temp_peers),
+            "healthy_peer_count": healthy_count,
+            "peer_consensus_temp": med_t,
+            "peer_mad_temp": mad_t,
+            "absolute_residual": float(dev_t),
+            "change_residual": float(change_residual),
+            "station_delta": float(station_delta),
+            "peer_consensus_delta": float(peer_consensus_delta),
+            "spatial_confidence": spatial_confidence,
+            "spatial_status": spatial_status
+        }
 
         return SpatialConsensusOutput(
-            neighbor_count=len(n_temps),
+            neighbor_count=len(temp_peers),
             neighbor_ids=n_ids,
             distances_km=distances,
             median_temp=med_t,
@@ -213,4 +347,15 @@ class SpatialNeighborResolver:
             target_deviation_humi=float(dev_h),
             spatial_consensus_score=round(consensus_score, 4),
             is_spatially_inconsistent=is_inconsistent,
+            valid_peer_count=len(temp_peers),
+            healthy_peer_count=healthy_count,
+            effective_peer_count=round(sum(p["weight"] for p in temp_peers), 2),
+            peer_mad_temp=float(mad_t),
+            peer_mad_pres=float(mad_p),
+            peer_mad_humi=float(mad_h),
+            temp_absolute_residual=float(dev_t),
+            temp_change_residual=float(change_residual),
+            spatial_confidence=spatial_confidence,
+            spatial_status=spatial_status,
+            evidence=evidence
         )

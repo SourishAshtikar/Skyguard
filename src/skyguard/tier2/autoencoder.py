@@ -119,8 +119,8 @@ class Tier2AutoencoderTrainer:
             diff = (self.model(va_tensor) - va_tensor).numpy()
             mse_errors = np.mean(diff ** 2, axis=1)
             self.threshold = float(np.percentile(mse_errors, 99.0))
-            if self.threshold < 0.01:
-                self.threshold = 0.035
+            if self.threshold < 1e-4:
+                self.threshold = 0.005
 
         return history
 

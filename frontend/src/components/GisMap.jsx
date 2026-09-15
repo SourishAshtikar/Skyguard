@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, memo } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -8,7 +8,7 @@ import {
   Tooltip,
   useMap,
 } from 'react-leaflet';
-import { ZoomIn, ZoomOut, Maximize2, Compass } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, Compass, Cloud } from 'lucide-react';
 
 // Controller to smoothly animate map camera ONLY when station is explicitly selected via search/list
 function MapController({ selectedStation, isMapClickRef }) {
@@ -49,7 +49,7 @@ function MapController({ selectedStation, isMapClickRef }) {
 }
 
 // Custom on-map zoom buttons (never hijacks user position)
-function MapControls({ totalStations = 900 }) {
+function MapControls({ showCloudLayer, setShowCloudLayer }) {
   const map = useMap();
   return (
     <div
@@ -84,6 +84,14 @@ function MapControls({ totalStations = 900 }) {
         style={{ color: '#00f0ff' }}
       >
         <Maximize2 size={14} />
+      </button>
+      <button
+        className={`glass-card map-ctrl-btn ${showCloudLayer ? 'btn-ghost-active' : ''}`}
+        onClick={() => setShowCloudLayer(!showCloudLayer)}
+        title={showCloudLayer ? 'Hide Satellite Cloud Layer' : 'Show Live NOAA/INSAT Satellite IR Cloud Cover'}
+        style={{ color: showCloudLayer ? '#38bdf8' : '#94a3b8' }}
+      >
+        <Cloud size={15} />
       </button>
     </div>
   );
@@ -156,7 +164,24 @@ export default function GisMap({
   searchRadiusKm = 150,
 }) {
   const isMapClickRef = useRef(false);
+  const [showCloudLayer, setShowCloudLayer] = useState(true);
+  const [radarTileUrl, setRadarTileUrl] = useState(null);
   const defaultCenter = [22.8, 79.5]; // Geographical center of India
+
+  // Fetch latest live global precipitation radar / cloud frame from RainViewer
+  useEffect(() => {
+    fetch('https://api.rainviewer.com/public/weather-maps.json')
+      .then((res) => res.json())
+      .then((data) => {
+        const latestPath = data?.radar?.past?.slice(-1)[0]?.path;
+        if (latestPath) {
+          setRadarTileUrl(`https://tilecache.rainviewer.com${latestPath}/256/{z}/{x}/{y}/2/1_1.png`);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load RainViewer weather tiles:', err);
+      });
+  }, []);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -171,7 +196,7 @@ export default function GisMap({
         zoomControl={false}
       >
         <MapController selectedStation={selectedStation} isMapClickRef={isMapClickRef} />
-        <MapControls />
+        <MapControls showCloudLayer={showCloudLayer} setShowCloudLayer={setShowCloudLayer} />
 
         {/* Esri World Dark Gray Base (Ultra-clean dark canvas without clutter or watermark) */}
         <TileLayer
@@ -179,6 +204,17 @@ export default function GisMap({
           attribution="&copy; Esri | IMD AWS National Mesonet"
           maxZoom={16}
         />
+
+        {/* Real-Time RainViewer Live Weather Radar & Cloud Cover Layer */}
+        {showCloudLayer && radarTileUrl && (
+          <TileLayer
+            url={radarTileUrl}
+            attribution="&copy; RainViewer Real-Time Weather Radar &amp; Satellite Imagery"
+            opacity={0.75}
+            maxNativeZoom={6}
+            maxZoom={16}
+          />
+        )}
 
         {/* Esri Dark Boundaries and Reference Labels */}
         <TileLayer
@@ -243,72 +279,88 @@ export default function GisMap({
         )}
       </MapContainer>
 
-      {/* Top-Right Active AWS Observatories Counter Badge */}
+      {/* Top-Right Unified Observatories & Status Legend Panel */}
       <div
-        className="glass-panel"
+        className="glass-panel map-header-legend"
         style={{
           position: 'absolute',
-          top: '16px',
-          right: '16px',
-          padding: '6px 14px',
+          top: '12px',
+          right: '12px',
+          padding: '8px 12px',
           zIndex: 1000,
           fontSize: '11px',
           display: 'flex',
-          gap: '10px',
-          alignItems: 'center',
-          backdropFilter: 'blur(20px)',
-          background: 'rgba(5, 5, 8, 0.92)',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
-          borderRadius: '6px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.8)',
-        }}
-      >
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3fb950', boxShadow: '0 0 8px #3fb950' }} />
-        <span style={{ color: '#f0f6fc', fontWeight: 600 }}>
-          {stations.length} AWS Stations Rendered
-        </span>
-        <span style={{ color: '#8b949e', fontSize: '10px' }}>
-          • IMD National Mesonet GIS
-        </span>
-      </div>
-
-      {/* Mesonet Spatial Status Legend */}
-      <div
-        className="glass-panel"
-        style={{
-          position: 'absolute',
-          bottom: '16px',
-          right: '16px',
-          padding: '8px 16px',
-          zIndex: 1000,
-          fontSize: '11px',
-          display: 'flex',
-          gap: '16px',
-          alignItems: 'center',
-          backdropFilter: 'blur(20px)',
-          background: 'rgba(5, 5, 8, 0.95)',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
+          flexDirection: 'column',
+          gap: '6px',
+          background: 'rgba(15, 23, 42, 0.92)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '8px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.8)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
+          maxWidth: 'calc(100vw - 80px)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#00e599', boxShadow: '0 0 8px #00e599' }} />
-          <span style={{ color: '#f8fafc', fontWeight: 600 }}>Nominal</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+            <span style={{ color: '#f8fafc', fontWeight: 700, fontSize: '0.75rem' }}>
+              {stations.length} AWS Stations
+            </span>
+          </div>
+          <button
+            onClick={() => setShowCloudLayer(!showCloudLayer)}
+            style={{
+              background: showCloudLayer ? '#0284c7' : '#1e293b',
+              border: showCloudLayer ? '1px solid #38bdf8' : '1px solid #475569',
+              borderRadius: '12px',
+              padding: '3px 10px',
+              color: '#ffffff',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 700,
+              boxShadow: showCloudLayer ? '0 0 10px rgba(56, 189, 248, 0.4)' : 'none',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            title="Toggle Satellite IR Cloud Cover Layer on Map"
+          >
+            <Cloud size={13} color="#ffffff" />
+            <span>Satellite Clouds</span>
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: showCloudLayer ? '#38bdf8' : '#64748b',
+                boxShadow: showCloudLayer ? '0 0 6px #38bdf8' : 'none',
+              }}
+            />
+          </button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ffb800', boxShadow: '0 0 8px #ffb800' }} />
-          <span style={{ color: '#f8fafc', fontWeight: 600 }}>Suspect</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ff3366', boxShadow: '0 0 8px #ff3366' }} />
-          <span style={{ color: '#f8fafc', fontWeight: 600 }}>Anomaly</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#00f0ff', boxShadow: '0 0 8px #00f0ff' }} />
-          <span style={{ color: '#f8fafc', fontWeight: 600 }}>Extreme Weather</span>
+
+        {/* Legend Indicators */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00e599' }} />
+            <span style={{ color: '#cbd5e1', fontSize: '0.68rem' }}>Nominal</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffb800' }} />
+            <span style={{ color: '#cbd5e1', fontSize: '0.68rem' }}>Suspect</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff3366' }} />
+            <span style={{ color: '#cbd5e1', fontSize: '0.68rem' }}>Anomaly</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00f0ff' }} />
+            <span style={{ color: '#cbd5e1', fontSize: '0.68rem' }}>Storm Event</span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+

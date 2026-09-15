@@ -297,6 +297,7 @@ export default function TelemetryHUD({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {/* Sensor Metric HUD Cards with Live Corrected Value Display */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+
         {/* Temperature Card */}
         <div
           className={`glass-card metric-card ${activeParam === 'temperature' ? 'metric-card-active' : ''}`}
@@ -335,7 +336,7 @@ export default function TelemetryHUD({
             </div>
           ) : (
             <div className="metric-subtext" title="Dew point = the temperature at which air becomes saturated and water condenses. High dew point means muggy/sticky air.">
-              💧 Dew Pt: {dewPoint != null ? `${Number(dewPoint).toFixed(1)}°C` : '--'}
+              Dew Pt: {dewPoint != null ? `${Number(dewPoint).toFixed(1)}°C` : '--'}
               <span style={{ fontSize: '0.6rem', color: '#8b949e', display: 'block' }}>Air moisture saturation point</span>
             </div>
           )}
@@ -379,7 +380,7 @@ export default function TelemetryHUD({
             </div>
           ) : (
             <div className="metric-subtext" title="Vapor pressure = partial pressure of water vapor in the air. Indicates absolute atmospheric moisture density.">
-              💨 Vapor: {vaporPres != null ? `${Number(vaporPres).toFixed(1)} hPa` : '--'}
+              Vapor: {vaporPres != null ? `${Number(vaporPres).toFixed(1)} hPa` : '--'}
               <span style={{ fontSize: '0.6rem', color: '#8b949e', display: 'block' }}>Absolute moisture pressure</span>
             </div>
           )}
@@ -423,7 +424,7 @@ export default function TelemetryHUD({
             </div>
           ) : (
             <div className="metric-subtext" title="Heat Index = how hot it actually feels when humidity is factored in. High humidity prevents sweat from evaporating, making it feel hotter.">
-              🌡️ Heat Idx: {heatIndex != null ? `${Number(heatIndex).toFixed(1)}°C` : '--'}
+              Heat Idx: {heatIndex != null ? `${Number(heatIndex).toFixed(1)}°C` : '--'}
               <span style={{ fontSize: '0.6rem', color: '#8b949e', display: 'block' }}>Feels-like temp with humidity</span>
             </div>
           )}
@@ -455,12 +456,12 @@ export default function TelemetryHUD({
             }}
           >
             {rawBatt >= 12.5
-              ? '✓ Fully charged (≥12.5V)'
+              ? 'Fully charged (≥12.5V)'
               : rawBatt >= 12.0
-              ? '⚠ Good (12.0–12.5V)'
+              ? 'Good (12.0–12.5V)'
               : rawBatt >= 11.5
-              ? '⚠ Low (11.5–12.0V) — check soon'
-              : '⛔ Critical (<11.5V) — data at risk'}
+              ? 'Low (11.5–12.0V) — check soon'
+              : 'Critical (<11.5V) — data at risk'}
           </div>
           {/* WMO QC Flag — data quality, not battery */}
           <div
@@ -555,12 +556,15 @@ export default function TelemetryHUD({
                 domain={['auto', 'auto']}
               />
               <Tooltip
+                cursor={{ stroke: '#38bdf8', strokeWidth: 1, strokeDasharray: '3 3' }}
                 contentStyle={{
-                  background: '#161b22',
-                  border: '1px solid #30363d',
+                  background: '#090d16',
+                  border: '1px solid #1e293b',
                   borderRadius: '6px',
                   fontSize: '11px',
-                  color: '#f0f6fc',
+                  color: '#f8fafc',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.8)',
+                  padding: '8px 12px',
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
@@ -572,8 +576,9 @@ export default function TelemetryHUD({
                   name="Raw Temp (°C)"
                   stroke="#58a6ff"
                   strokeWidth={2}
-                  dot={{ r: 2, fill: '#58a6ff' }}
-                  activeDot={{ r: 4 }}
+                  dot={{ r: 3.5, fill: '#58a6ff', strokeWidth: 1, stroke: '#080c14' }}
+                  activeDot={{ r: 6, fill: '#38bdf8', stroke: '#ffffff', strokeWidth: 2 }}
+                  isAnimationActive={false}
                 />
               )}
 
@@ -585,7 +590,9 @@ export default function TelemetryHUD({
                   stroke="#bc8cff"
                   strokeWidth={1.8}
                   strokeDasharray="4 4"
-                  dot={false}
+                  dot={{ r: 2.5, fill: '#bc8cff', strokeWidth: 1, stroke: '#080c14' }}
+                  activeDot={{ r: 5, fill: '#bc8cff', stroke: '#ffffff', strokeWidth: 2 }}
+                  isAnimationActive={false}
                 />
               )}
 
@@ -596,8 +603,9 @@ export default function TelemetryHUD({
                   name="Raw Pressure (hPa)"
                   stroke="#bc8cff"
                   strokeWidth={2}
-                  dot={{ r: 2, fill: '#bc8cff' }}
-                  activeDot={{ r: 4 }}
+                  dot={{ r: 3.5, fill: '#bc8cff', strokeWidth: 1, stroke: '#080c14' }}
+                  activeDot={{ r: 6, fill: '#bc8cff', stroke: '#ffffff', strokeWidth: 2 }}
+                  isAnimationActive={false}
                 />
               )}
 
@@ -609,7 +617,9 @@ export default function TelemetryHUD({
                   stroke="#3fb950"
                   strokeWidth={1.8}
                   strokeDasharray="4 4"
-                  dot={false}
+                  dot={{ r: 2.5, fill: '#3fb950', strokeWidth: 1, stroke: '#080c14' }}
+                  activeDot={{ r: 5, fill: '#3fb950', stroke: '#ffffff', strokeWidth: 2 }}
+                  isAnimationActive={false}
                 />
               )}
 
@@ -620,8 +630,22 @@ export default function TelemetryHUD({
                   name="Raw Humidity (%)"
                   stroke="#3fb950"
                   strokeWidth={2}
-                  dot={{ r: 2, fill: '#3fb950' }}
-                  activeDot={{ r: 4 }}
+                  dot={{ r: 3.5, fill: '#3fb950', strokeWidth: 1, stroke: '#080c14' }}
+                  activeDot={{ r: 6, fill: '#3fb950', stroke: '#ffffff', strokeWidth: 2 }}
+                  isAnimationActive={false}
+                />
+              )}
+              {activeParam === 'humidity' && showCorrected && (
+                <Line
+                  type="monotone"
+                  dataKey="corrected_humi"
+                  name="Kalman Imputed (%)"
+                  stroke="#58a6ff"
+                  strokeWidth={1.8}
+                  strokeDasharray="4 4"
+                  dot={{ r: 2.5, fill: '#58a6ff', strokeWidth: 1, stroke: '#080c14' }}
+                  activeDot={{ r: 5, fill: '#58a6ff', stroke: '#ffffff', strokeWidth: 2 }}
+                  isAnimationActive={false}
                 />
               )}
             </LineChart>
@@ -827,7 +851,7 @@ export default function TelemetryHUD({
             </div>
           ) : (
             <div style={{ background: '#0d1117', border: '1px solid #238636', borderRadius: '4px', padding: '8px 10px', fontSize: '0.72rem', color: '#3fb950' }}>
-              ✓ All 4 validation tiers passed. Thermometry, barometry, and hygrometry adhere strictly to the Magnus-Tetens equation and WMO Guide No. 8 standards. Corroborated by spaceborne satellite and regional mesonet peers.
+              All 4 validation tiers passed. Thermometry, barometry, and hygrometry adhere strictly to the Magnus-Tetens equation and WMO Guide No. 8 standards. Corroborated by spaceborne satellite and regional mesonet peers.
             </div>
           )}
 

@@ -63,16 +63,16 @@ export default function SatelliteView({
   // Badge text for the top status bar
   let statusBadge, statusBadgeClass;
   if (isStorm) {
-    statusBadge = '⚡ STORM CONFIRMED';
+    statusBadge = 'STORM CONFIRMED';
     statusBadgeClass = 'badge-weather';
   } else if (isPrecipitating) {
-    statusBadge = '🌧 ACTIVE RAIN';
+    statusBadge = 'ACTIVE RAIN';
     statusBadgeClass = 'badge-weather';
   } else if (isConsistent) {
-    statusBadge = '✓ SATELLITE VERIFIED';
+    statusBadge = 'SATELLITE VERIFIED';
     statusBadgeClass = 'badge-pass';
   } else {
-    statusBadge = '⚠ THERMAL DIVERGENCE';
+    statusBadge = 'THERMAL DIVERGENCE';
     statusBadgeClass = 'badge-fail';
   }
 
@@ -103,6 +103,7 @@ export default function SatelliteView({
           border: '1px solid #30363d',
         }}
       >
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div
             style={{

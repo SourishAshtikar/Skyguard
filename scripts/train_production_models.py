@@ -126,27 +126,27 @@ def generate_tier3_training_dataset(
             station_id = str(df.get("station_id", [f.stem.split("_")[0]])[0])
 
             # Scenario A: Normal baseline
-            base_df = df.iloc[-400:].copy().reset_index(drop=True)
+            base_df = df.iloc[-300:].copy().reset_index(drop=True)
             base_feats = extract_batch_features(base_df)
-            for _, row in base_feats.iloc[48:].iterrows():
-                # Normal reading: high spatial consensus, low deviation, low mahalanobis
+            for _, row in base_feats.iloc[48:168].iterrows():
+                # Normal reading: realistic spatial consensus, target deviation, and diurnal Mahalanobis innovations
                 vec = [row.get(k, 0.0) for k in CANONICAL_FEATURES]
-                vec.append(rng.uniform(0.85, 1.0))   # high spatial consensus
-                vec.append(rng.uniform(0.0, 1.5))    # low deviation
-                vec.append(rng.uniform(0.1, 3.0))    # low mahalanobis
+                vec.append(rng.uniform(0.65, 1.0))   # realistic spatial consensus
+                vec.append(rng.uniform(0.0, 3.5))    # target deviation
+                vec.append(rng.uniform(0.1, 20.0))   # realistic Mahalanobis distance range for normal telemetry
                 X_rows.append(vec)
                 y_weather_list.append(0)  # Not an anomaly/weather event
-                y_causes_list.append(0)   # Default class
+                y_causes_list.append(0)   # Default NONE class
 
             # Scenario B: Genuine Severe Weather Event (Monsoon / Squall / Heatwave)
             weather_df = base_df.copy()
             w_idx = len(weather_df) // 2
-            weather_df.loc[w_idx:w_idx+20, "temperature"] -= rng.uniform(6.0, 12.0)
-            weather_df.loc[w_idx:w_idx+20, "pressure"] -= rng.uniform(8.0, 15.0)
-            weather_df.loc[w_idx:w_idx+20, "humidity"] = np.clip(weather_df.loc[w_idx:w_idx+20, "humidity"] + 30.0, 0, 100)
+            weather_df.loc[w_idx:w_idx+30, "temperature"] -= rng.uniform(6.0, 12.0)
+            weather_df.loc[w_idx:w_idx+30, "pressure"] -= rng.uniform(8.0, 15.0)
+            weather_df.loc[w_idx:w_idx+30, "humidity"] = np.clip(weather_df.loc[w_idx:w_idx+30, "humidity"] + 30.0, 0, 100)
             w_feats = extract_batch_features(weather_df)
 
-            for _, row in w_feats.iloc[w_idx:w_idx+20].iterrows():
+            for _, row in w_feats.iloc[w_idx:w_idx+30].iterrows():
                 vec = [row.get(k, 0.0) for k in CANONICAL_FEATURES]
                 # High spatial consensus because mesonet confirms ambient shift
                 vec.append(rng.uniform(0.80, 0.98))

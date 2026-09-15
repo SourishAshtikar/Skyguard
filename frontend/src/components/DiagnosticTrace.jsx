@@ -39,6 +39,7 @@ export default function DiagnosticTrace({ latestResult }) {
           background: '#161b22',
         }}
       >
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Zap size={15} color="#58a6ff" />
           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f0f6fc' }}>

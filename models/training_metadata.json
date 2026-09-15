@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-09-13 11:02:20",
+  "timestamp": "2026-09-15 17:44:13",
   "total_stations_available": 465,
   "tier2_samples": 132713,
-  "tier2_train_loss": 0.050426929528463074,
-  "tier2_val_loss": 0.03749111667275429,
-  "tier2_threshold": 0.249171644449234,
-  "tier3_samples": 16368,
-  "weather_classifier_f1": 1.0,
+  "tier2_train_loss": 0.06157786568649267,
+  "tier2_val_loss": 0.04694060981273651,
+  "tier2_threshold": 0.26423579454421997,
+  "tier3_samples": 6600,
+  "weather_classifier_f1": 0.9984003852001699,
   "fault_diagnoser_f1": 1.0,
   "feature_names": [
     "temp",
@@ -53,6 +53,7 @@
     "NOISE_JITTER",
     "RANGE_VIOLATION",
     "SPATIAL_INCONSISTENCY",
-    "TEMPORAL_PATTERN_BREAK"
+    "TEMPORAL_PATTERN_BREAK",
+    "UNKNOWN"
   ]
 }
